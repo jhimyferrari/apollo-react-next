@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Apollo System - Frontend
 
-## Getting Started
+Frontend do **Apollo System**, um sistema de gestão empresarial moderno para pequenas e médias empresas brasileiras com suporte multi-tenant, desenvolvido com **Next.js (App Router)**, **React 19**, **TypeScript** e **Tailwind CSS**.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🚀 Tecnologias e Padrões Principais
+
+* **Framework**: Next.js 16 (App Router com Turbopack)
+* **Reatividade**: React 19 + TypeScript
+* **Design & Estilo**: Tailwind CSS v4 + Componentes Modernos (base shadcn/ui com Radix UI Headless)
+* **Formulários & Validação**: `react-hook-form` + `zod`
+* **Gerenciamento de Estado de Servidor**: `@tanstack/react-query` v5
+* **Notificações**: `sonner`
+* **Arquitetura**: Feature-Driven / Modular por Domínio (sem lógica de negócio duplicada)
+* **Moedas & Datas**: `Intl.NumberFormat` (BRL a partir de strings monetárias, sem float) e `Intl.DateTimeFormat` (pt-BR)
+
+---
+
+## 📋 Pré-requisitos
+
+* **Node.js**: Versão 20.x ou superior recomendada
+* **npm**: Versão 10.x ou superior (ou gerenciador compatível)
+* **API Backend**: Servidor Laravel rodando (por padrão em `http://localhost:8000/api`)
+
+---
+
+## ⚙️ Variáveis de Ambiente
+
+Crie ou edite o arquivo `.env.local` na raiz do projeto:
+
+```env
+# URL base para a API Laravel do Apollo
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Como Instalar e Rodar
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Instalar dependências**:
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. **Executar em ambiente de desenvolvimento**:
+   ```bash
+   npm run dev
+   ```
+   Acesse a aplicação no navegador em [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+3. **Gerar build de produção**:
+   ```bash
+   npm run build
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Executar build de produção**:
+   ```bash
+   npm run start
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. **Checagem de Lint**:
+   ```bash
+   npm run lint
+   ```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📚 Documentação Técnica Completa
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Para aprofundar na engenharia e decisões de design do projeto, consulte a documentação detalhada:
+
+* **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**:
+  * Árvore de pastas comentada e convenções de nomenclatura
+  * Diagrama de fluxo de dados completo em Mermaid (`Tela → Hook → Service → Cliente HTTP → API → UI`)
+  * Fluxo de autenticação multi-tenant e tratamento de sessão/expiração (401)
+  * Resolução e normalização unificada de erros (`VALIDATION_ERROR`, chaves aninhadas e toasts)
+  * Guia passo a passo para adicionar novos módulos/features ao ERP
+* **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)**:
+  * Justificativa técnica minuciosa de cada dependência de produção e desenvolvimento
+  * Racional de "Zero Over-engineering"
+
+---
+
+## 🔐 Contrato de Autenticação
+
+* **Login**: `POST /v1/login` com `{ email, password, organization_document }`.
+* **Token**: Bearer token injetado automaticamente pelo cliente HTTP central ([`lib/api/client.ts`](lib/api/client.ts)).
+* **Logout**: `POST /v1/logout` com limpeza determinística no cliente e redirecionamento para `/login`.
+* **Erros 401**: Interceptor global desloga e redireciona automaticamente para a tela de login.
+
+---
+
+## 📄 Licença
+
+Proprietário - Apollo System. Todos os direitos reservados.
