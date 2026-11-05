@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { CategoryForm } from "@/features/categories/components/category-form";
 import { useCategory } from "@/features/categories/hooks/use-categories";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function EditCategoryPage({
@@ -61,15 +62,21 @@ export default function EditCategoryPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Editar Categoria: ${category.name}`}
-        description={`Código #${category.number} • Atualize as informações desejadas`}
-      />
+    <PermissionGuard
+      permission="category.update"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para editar os dados desta categoria."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Editar Categoria: ${category.name}`}
+          description={`Código #${category.number} • Atualize as informações desejadas`}
+        />
 
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-        <CategoryForm initialData={category} />
+        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+          <CategoryForm initialData={category} />
+        </div>
       </div>
-    </div>
+    </PermissionGuard>
   );
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { SalesOrderDetails } from "@/features/sales-orders/components/sales-order-details";
 import { useSalesOrder } from "@/features/sales-orders/hooks/use-sales-orders";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function ViewSalesOrderPage({
@@ -61,13 +62,19 @@ export default function ViewSalesOrderPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Pedido de Venda #${order.number}`}
-        description={`Cliente: ${order.client?.legal_name || "N/A"}`}
-      />
+    <PermissionGuard
+      permission="sales-order.view"
+      title="Acesso Restrito"
+      description="Você não possui permissão para visualizar os detalhes deste pedido de venda."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Pedido de Venda #${order.number}`}
+          description={`Cliente: ${order.client?.legal_name || "N/A"}`}
+        />
 
-      <SalesOrderDetails order={order} />
-    </div>
+        <SalesOrderDetails order={order} />
+      </div>
+    </PermissionGuard>
   );
 }

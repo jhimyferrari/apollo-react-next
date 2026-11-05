@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/auth/token";
+import { getToken, subscribeAuthChange } from "@/lib/auth/token";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { Loader2 } from "lucide-react";
@@ -13,17 +13,23 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const isHydrated = useSyncExternalStore(
+    subscribeAuthChange,
+    () => true,
+    () => false
+  );
+  const token = useSyncExternalStore(
+    subscribeAuthChange,
+    getToken,
+    () => undefined
+  );
+  const isAuthenticated = isHydrated ? Boolean(token) : null;
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
+    if (isAuthenticated === false) {
       router.replace("/login");
-      setIsAuthenticated(false);
-    } else {
-      setIsAuthenticated(true);
     }
-  }, [router]);
+  }, [isAuthenticated, router]);
 
   if (isAuthenticated === null) {
     return (

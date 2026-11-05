@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import { Sun, Moon, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserNav } from "./user-nav";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import {
   Package,
   ShoppingCart,
@@ -20,23 +21,46 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 
+const ROUTE_LABELS: Record<string, string> = {
+  products: "Produtos",
+  brands: "Marcas",
+  categories: "Categorias",
+  "sales-orders": "Pedidos de Venda",
+  "purchase-orders": "Pedidos de Compra",
+  clients: "Clientes",
+  sellers: "Vendedores",
+  suppliers: "Fornecedores",
+  users: "Usuários",
+  new: "Novo Cadastro",
+};
+
+function formatBreadcrumb(pathname: string): string {
+  if (pathname === "/") return "Visão Geral";
+  const segments = pathname.split("/").filter(Boolean);
+  const first = ROUTE_LABELS[segments[0]] || segments[0].replace(/-/g, " ");
+  if (segments.length === 1) return first;
+  if (segments[1] === "new") return `${first} / Novo`;
+  return `${first} / Detalhes`;
+}
+
 export function Header() {
   const { theme, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { can } = usePermissions();
 
   const mobileNavLinks = [
     { name: "Visão Geral", href: "/", icon: LayoutDashboard },
-    { name: "Produtos", href: "/products", icon: Package },
-    { name: "Marcas", href: "/brands", icon: Tags },
-    { name: "Categorias", href: "/categories", icon: FolderTree },
-    { name: "Pedidos de Venda", href: "/sales-orders", icon: ShoppingCart },
-    { name: "Pedidos de Compra", href: "/purchase-orders", icon: ShoppingBag },
-    { name: "Clientes", href: "/clients", icon: Users },
-    { name: "Vendedores", href: "/sellers", icon: Briefcase },
-    { name: "Fornecedores", href: "/suppliers", icon: Truck },
-    { name: "Usuários", href: "/users", icon: ShieldCheck },
-  ];
+    { name: "Produtos", href: "/products", icon: Package, permission: "product.view" },
+    { name: "Marcas", href: "/brands", icon: Tags, permission: "brand.view" },
+    { name: "Categorias", href: "/categories", icon: FolderTree, permission: "category.view" },
+    { name: "Pedidos de Venda", href: "/sales-orders", icon: ShoppingCart, permission: "sales-order.view" },
+    { name: "Pedidos de Compra", href: "/purchase-orders", icon: ShoppingBag, permission: "purchase-order.view" },
+    { name: "Clientes", href: "/clients", icon: Users, permission: "client.view" },
+    { name: "Vendedores", href: "/sellers", icon: Briefcase, permission: "seller.view" },
+    { name: "Fornecedores", href: "/suppliers", icon: Truck, permission: "supplier.view" },
+    { name: "Usuários", href: "/users", icon: ShieldCheck, permission: "user.view" },
+  ].filter((item) => !item.permission || can(item.permission));
 
   return (
     <header className="h-16 border-b border-border bg-card/60 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
@@ -57,8 +81,8 @@ export function Header() {
       <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
         <span>Apollo System</span>
         <span>/</span>
-        <span className="font-medium text-foreground capitalize">
-          {pathname === "/" ? "Visão Geral" : pathname.replace("/", "").replace(/-/g, " ")}
+        <span className="font-medium text-foreground">
+          {formatBreadcrumb(pathname)}
         </span>
       </div>
 

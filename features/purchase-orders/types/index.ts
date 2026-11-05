@@ -49,10 +49,24 @@ export interface UpdatePurchaseOrderRequest {
     to_add?: StorePurchaseOrderItemInput[];
     to_update?: Array<{
       id: string;
-      product_id?: string;
       number?: number;
       quantity?: number;
     }>;
-    to_remove?: Array<{ id: string }>;
+    to_remove?: string[];
+  };
+}
+
+export interface OutdatedPriceWarning {
+  product_id: string;
+  product_name: string;
+  negotiated_price: string | number;
+  current_price: string | number;
+}
+
+export interface ReopenPurchaseOrderResponse {
+  message: string;
+  data?: {
+    order: PurchaseOrderResource;
+    outdated_prices?: OutdatedPriceWarning[];
   };
 }

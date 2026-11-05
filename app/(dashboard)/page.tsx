@@ -1,6 +1,9 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import {
   Card,
   CardHeader,
@@ -18,11 +21,14 @@ import {
   Truck,
   Plus,
   ArrowRight,
-  TrendingUp,
   Tags,
+  FolderTree,
+  ShieldCheck,
 } from "lucide-react";
 
 export default function DashboardHomePage() {
+  const { can } = usePermissions();
+
   const quickActions = [
     {
       title: "Novo Pedido de Venda",
@@ -30,6 +36,7 @@ export default function DashboardHomePage() {
       href: "/sales-orders/new",
       icon: ShoppingCart,
       color: "text-emerald-500",
+      permission: "sales-order.create",
     },
     {
       title: "Novo Produto",
@@ -37,6 +44,7 @@ export default function DashboardHomePage() {
       href: "/products/new",
       icon: Package,
       color: "text-blue-500",
+      permission: "product.create",
     },
     {
       title: "Novo Pedido de Compra",
@@ -44,6 +52,7 @@ export default function DashboardHomePage() {
       href: "/purchase-orders/new",
       icon: ShoppingBag,
       color: "text-purple-500",
+      permission: "purchase-order.create",
     },
     {
       title: "Novo Cliente",
@@ -51,8 +60,9 @@ export default function DashboardHomePage() {
       href: "/clients/new",
       icon: Users,
       color: "text-amber-500",
+      permission: "client.create",
     },
-  ];
+  ].filter((action) => can(action.permission));
 
   const modules = [
     {
@@ -60,44 +70,65 @@ export default function DashboardHomePage() {
       description: "Gestão completa de preços, unidades, NCM, marcas e categorias",
       href: "/products",
       icon: Package,
+      permission: "product.view",
     },
     {
       title: "Pedidos de Venda",
       description: "Ordens comerciais com confirmação, cancelamento e reabertura",
       href: "/sales-orders",
       icon: ShoppingCart,
+      permission: "sales-order.view",
     },
     {
       title: "Pedidos de Compra",
       description: "Suprimentos e ordens de compra emitidas para fornecedores",
       href: "/purchase-orders",
       icon: ShoppingBag,
+      permission: "purchase-order.view",
     },
     {
       title: "Clientes & Endereços",
       description: "Base cadastral com múltiplos endereços e endereço padrão",
       href: "/clients",
       icon: Users,
+      permission: "client.view",
     },
     {
       title: "Vendedores",
       description: "Equipe comercial, documentos e endereços vinculados",
       href: "/sellers",
       icon: Briefcase,
+      permission: "seller.view",
     },
     {
       title: "Fornecedores",
       description: "Parceiros de compras, documentos e endereços",
       href: "/suppliers",
       icon: Truck,
+      permission: "supplier.view",
     },
     {
       title: "Marcas",
       description: "Gestão e cadastro de marcas de produtos",
       href: "/brands",
       icon: Tags,
+      permission: "brand.view",
     },
-  ];
+    {
+      title: "Categorias",
+      description: "Classificação e agrupamento de produtos do catálogo",
+      href: "/categories",
+      icon: FolderTree,
+      permission: "category.view",
+    },
+    {
+      title: "Usuários & Permissões",
+      description: "Administração de acessos e permissões da organização",
+      href: "/users",
+      icon: ShieldCheck,
+      permission: "user.view",
+    },
+  ].filter((mod) => can(mod.permission));
 
   return (
     <div className="space-y-8">
@@ -107,43 +138,45 @@ export default function DashboardHomePage() {
       />
 
       {/* Ações Rápidas */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Ações Rápidas
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Card
-                key={action.href}
-                className="hover:border-foreground/20 transition-all hover:shadow-md bg-card/60"
-              >
-                <CardHeader className="p-5 pb-3">
-                  <div className="flex items-center justify-between">
-                    <Icon className={`h-5 w-5 ${action.color}`} />
-                    <Plus className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-base font-semibold mt-3">
-                    {action.title}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {action.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-5 pt-0">
-                  <Button asChild size="sm" variant="ghost" className="w-full justify-between mt-2 text-xs">
-                    <Link href={action.href}>
-                      Iniciar Cadastro
-                      <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
+      {quickActions.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Ações Rápidas
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Card
+                  key={action.href}
+                  className="hover:border-foreground/20 transition-all hover:shadow-md bg-card/60"
+                >
+                  <CardHeader className="p-5 pb-3">
+                    <div className="flex items-center justify-between">
+                      <Icon className={`h-5 w-5 ${action.color}`} />
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <CardTitle className="text-base font-semibold mt-3">
+                      {action.title}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {action.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-5 pt-0">
+                    <Button asChild size="sm" variant="ghost" className="w-full justify-between mt-2 text-xs">
+                      <Link href={action.href}>
+                        Iniciar Cadastro
+                        <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Módulos do Sistema */}
       <section className="space-y-4">

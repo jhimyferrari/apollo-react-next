@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -33,6 +34,7 @@ import {
   useCancelPurchaseOrder,
   useDeletePurchaseOrder,
 } from "../hooks/use-purchase-orders";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import {
   MoreHorizontal,
   Eye,
@@ -47,9 +49,17 @@ import {
 import type { PurchaseOrderResource } from "../types";
 
 export function PurchaseOrderTable() {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrderResource | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<PurchaseOrderResource | null>(null);
+
+  const { can } = usePermissions();
+  const canView = can("purchase-order.view");
+  const canCreate = can("purchase-order.create");
+  const canEdit = can("purchase-order.update");
+  const canDelete = can("purchase-order.delete");
+  const hasActions = canView || canEdit || canDelete;
 
   const { data, isLoading, isError, error, refetch } = usePurchaseOrders(page);
   const confirmMutation = useConfirmPurchaseOrder();
@@ -70,7 +80,10 @@ export function PurchaseOrderTable() {
 
   const handleReopenOrder = async (id: string) => {
     try {
-      await reopenMutation.mutateAsync(id);
+      const res = await reopenMutation.mutateAsync(id);
+      if (res?.data?.order?.id) {
+        router.push(`/purchase-orders/${res.data.order.id}`);
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -96,8 +109,22 @@ export function PurchaseOrderTable() {
     }
   };
 
+  if (!canView) {
+    return (
+      <div className="rounded-lg border border-border bg-card/60 p-8 text-center my-6">
+        <ShoppingBag className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <h3 className="font-semibold text-foreground">
+          Visualização não permitida
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Você não possui permissão para visualizar a listagem de pedidos de compra.
+        </p>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <TableSkeleton rows={8} cols={7} />;
+    return <TableSkeleton rows={8} cols={hasActions ? 7 : 6} />;
   }
 
   if (isError) {
@@ -124,12 +151,14 @@ export function PurchaseOrderTable() {
         title="Nenhum pedido de compra encontrado"
         description="Emita ordens de compra para seus fornecedores de matéria-prima e revenda."
         action={
-          <Button asChild>
-            <Link href="/purchase-orders/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Pedido de Compra
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild>
+              <Link href="/purchase-orders/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Pedido de Compra
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -147,7 +176,9 @@ export function PurchaseOrderTable() {
               <TableHead className="w-28 text-center">Status</TableHead>
               <TableHead className="w-28 text-center">Pagamento</TableHead>
               <TableHead className="w-28">Data</TableHead>
-              <TableHead className="w-16 text-center">Ações</TableHead>
+              {hasActions && (
+                <TableHead className="w-16 text-center">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -202,70 +233,83 @@ export function PurchaseOrderTable() {
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(order.created_at)}
                   </TableCell>
-                  <TableCell className="text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Opções</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/purchase-orders/${order.id}`}
-                            className="cursor-pointer flex items-center"
-                          >
-                            <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Visualizar Detalhes
-                          </Link>
-                        </DropdownMenuItem>
+                  {hasActions && (
+                    <TableCell className="text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Opções</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          {canView && (
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/purchase-orders/${order.id}`}
+                                className="cursor-pointer flex items-center"
+                              >
+                                <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Visualizar Detalhes
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
 
-                        {order.status === "draf" && (
-                          <DropdownMenuItem
-                            className="cursor-pointer text-emerald-600 focus:text-emerald-600"
-                            onClick={() => handleConfirmOrder(order.id)}
-                            disabled={confirmMutation.isPending}
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Confirmar Compra
-                          </DropdownMenuItem>
-                        )}
+                          {canView && canEdit && <DropdownMenuSeparator />}
 
-                        {order.status === "confirmed" && (
-                          <DropdownMenuItem
-                            className="cursor-pointer"
-                            onClick={() => handleReopenOrder(order.id)}
-                            disabled={reopenMutation.isPending}
-                          >
-                            <RotateCcw className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Reabrir Pedido
-                          </DropdownMenuItem>
-                        )}
+                          {canEdit && order.status === "draf" && (
+                            <DropdownMenuItem
+                              className="cursor-pointer text-emerald-600 focus:text-emerald-600"
+                              onClick={() => handleConfirmOrder(order.id)}
+                              disabled={confirmMutation.isPending}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Confirmar Compra
+                            </DropdownMenuItem>
+                          )}
 
-                        {order.status !== "cancelled" && (
-                          <DropdownMenuItem
-                            className="text-amber-600 focus:text-amber-600 cursor-pointer"
-                            onClick={() => setOrderToCancel(order)}
-                          >
-                            <Ban className="mr-2 h-4 w-4" />
-                            Cancelar Pedido
-                          </DropdownMenuItem>
-                        )}
+                          {canEdit &&
+                            (order.status === "confirmed" ||
+                              order.status === "cancelled") && (
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleReopenOrder(order.id)}
+                                disabled={reopenMutation.isPending}
+                              >
+                                <RotateCcw className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Reabrir Pedido
+                              </DropdownMenuItem>
+                            )}
 
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => setOrderToDelete(order)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                          {canEdit && order.status !== "cancelled" && (
+                            <DropdownMenuItem
+                              className="text-amber-600 focus:text-amber-600 cursor-pointer"
+                              onClick={() => setOrderToCancel(order)}
+                            >
+                              <Ban className="mr-2 h-4 w-4" />
+                              Cancelar Pedido
+                            </DropdownMenuItem>
+                          )}
+
+                          {(canView || canEdit) &&
+                            canDelete &&
+                            order.status === "draf" && (
+                              <DropdownMenuSeparator />
+                            )}
+                          {canDelete && order.status === "draf" && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                              onClick={() => setOrderToDelete(order)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

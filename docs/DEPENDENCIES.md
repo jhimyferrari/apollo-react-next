@@ -8,9 +8,9 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 
 ### 1.1. Framework e Reatividade Base
 
-#### `next` (`16.0.0`)
+#### `next` (`^16.4.3`)
 * **O que faz**: Framework React completo para aplicações web com suporte a Server/Client Components, App Router e otimização de rotas e assets.
-* **Por que foi escolhida**: Padrão moderno corporativo e exigência da stack do projeto. Permite roteamento hierárquico, separação de layouts compartilhados e otimização de compilação via Turbopack.
+* **Por que foi escolhida**: Padrão moderno corporativo e exigência da stack do projeto. Permite roteamento hierárquico, separação de layouts compartilhados (`(auth)` vs `(dashboard)`) e otimização de compilação via Turbopack.
 * **Onde é usada**: Estrutura de rotas em [`app/`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app), navegação (`useRouter`, `usePathname`, `<Link />`) e configuração em [`next.config.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/next.config.ts).
 
 #### `react` e `react-dom` (`19.2.0`)
@@ -24,7 +24,7 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 
 #### `@tanstack/react-query` (`^5.104.1`)
 * **O que faz**: Camada de gerenciamento de estado assíncrono de servidor (Server State Management).
-* **Por que foi escolhida**: O Apollo System possui mais de 10 recursos paginados, ações transacionais com mutações parciais (PATCH com diffs) e necessidade de sincronização reativa. O TanStack Query elimina centenas de linhas de código boilerplate com `useEffect`, gerenciando cache automático, invalidação reativa após mutações (ex.: reabrir/cancelar pedidos), deduplicação de requisições e estados previsíveis de loading/erro.
+* **Por que foi escolhida**: O Apollo System possui 10 recursos paginados, ações transacionais com mutações parciais (`PATCH` com diffs) e necessidade de sincronização reativa de estoque, pedidos, endereços e permissões. O TanStack Query elimina centenas de linhas de código boilerplate com `useEffect`, gerenciando cache automático, invalidação reativa após mutações (ex.: confirmar/reabrir/cancelar pedidos), deduplicação de requisições e estados previsíveis de loading/erro.
 * **Onde é usada**: Em [`components/providers/query-provider.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/providers/query-provider.tsx) e em todos os hooks de domínio (`features/*/hooks/`).
 
 ---
@@ -32,9 +32,9 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 ### 1.3. Formulários e Validação
 
 #### `react-hook-form` (`^7.65.0`)
-* **O que faz**: Biblioteca de controle de formulários baseada em inputs não-controlados com re-renderizações mínimas.
-* **Por que foi escolhida**: Máxima performance ao digitar, essencial para ERPs com formulários complexos e extensos (como itens dinâmicos de pedidos e cadastros fiscais).
-* **Onde é usada**: Em todos os formulários da aplicação ([`features/auth/components/login-form.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/auth/components/login-form.tsx), formulários de produtos, parceiros e pedidos).
+* **O que faz**: Biblioteca de controle de formulários baseada em inputs com re-renderizações mínimas e suporte a listas dinâmicas (`useFieldArray`).
+* **Por que foi escolhida**: Máxima performance ao digitar, essencial para ERPs com formulários complexos e extensos (como itens dinâmicos de pedidos, matriz de 36 permissões e cadastros fiscais).
+* **Onde é usada**: Em todos os formulários da aplicação ([`features/auth/components/login-form.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/auth/components/login-form.tsx), formulários de produtos, parceiros, endereços, usuários e pedidos).
 
 #### `zod` (`^4.1.12`)
 * **O que faz**: Validador de esquemas TypeScript-first.
@@ -42,7 +42,7 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 * **Onde é usada**: Em todos os schemas de domínio em `features/*/schemas/`.
 
 #### `@hookform/resolvers` (`^5.2.2`)
-* **O que faz**: Adaptador entre `react-hook-form` e bibliotecas de validação externa como `zod`.
+* **O que faz**: Adaptador oficial entre `react-hook-form` e bibliotecas de validação de esquemas como `zod`.
 * **Por que foi escolhida**: Integração nativa do schema Zod com o ciclo de validação do formulário.
 * **Onde é usada**: Como argumento `resolver: zodResolver(...)` nas chamadas de `useForm`.
 
@@ -63,12 +63,12 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 #### `class-variance-authority` (`^0.7.1`)
 * **O que faz**: Criação de variantes tipadas de componentes UI (ex.: `variant="destructive"`, `size="sm"`).
 * **Por que foi escolhida**: Padronização dos componentes primitivos shadcn/ui.
-* **Onde é usada**: Em [`components/ui/button.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/ui/button.tsx), [`components/ui/badge.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/ui/badge.tsx).
+* **Onde é usada**: Em [`components/ui/button.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/ui/button.tsx) e [`components/ui/badge.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/ui/badge.tsx).
 
 #### `lucide-react` (`^0.548.0`)
-* **O que faz**: Conjunto de ícones vetoriais modernos e leves em SVG.
+* **O que faz**: Conjunto de ícones vetoriais modernos e leves em SVG com suporte a tree-shaking.
 * **Por que foi escolhida**: Ícones consistentes e completos para sistemas administrativos e ERP.
-* **Onde é usada**: Na Sidebar, Header, formulários, botões de ação e tabelas.
+* **Onde é usada**: Na Sidebar, Header, formulários, botões de ação, estados vazios e tabelas.
 
 #### `next-themes` (`^0.4.6`)
 * **O que faz**: Gerenciador de tema Dark/Light com persistência e prevenção de flash de cor (FOUC).
@@ -77,8 +77,8 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 
 #### `sonner` (`^2.0.8`)
 * **O que faz**: Biblioteca de notificações em Toast.
-* **Por que foi escolhida**: Requisito explícito de feedback da API (mensagens de sucesso `message` e erros genéricos em toast). Extremamente leve (<4KB gzipped), acessível e recomendada pelo shadcn/ui.
-* **Onde é usada**: Em [`components/ui/sonner.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/ui/sonner.tsx), montada em [`app/layout.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app/layout.tsx) e disparada via `toast.success() / toast.error()` nos hooks.
+* **Por que foi escolhida**: Requisito explícito de feedback da API (mensagens de sucesso `message` e erros de negócio/permissão em toast). Extremamente leve (<4KB gzipped), acessível e recomendada pelo shadcn/ui.
+* **Onde é usada**: Em [`components/ui/sonner.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/ui/sonner.tsx), montada em [`app/layout.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app/layout.tsx) e disparada via `toast.success() / toast.error()` nos hooks e formulários.
 
 ---
 
@@ -88,13 +88,13 @@ Os seguintes componentes Radix foram adotados para garantir 100% de conformidade
 
 * **`@radix-ui/react-slot` (`^1.2.3`)**: Permite o padrão `asChild` em botões e links.
 * **`@radix-ui/react-label` (`^2.1.7`)**: Rótulos acessíveis associados aos inputs.
-* **`@radix-ui/react-dialog` (`^1.2.0`)**: Modais para criação e edição rápida.
+* **`@radix-ui/react-dialog` (`^1.2.0`)**: Modais para criação e edição rápida (ex.: Endereços, Marcas, Categorias).
 * **`@radix-ui/react-alert-dialog` (`^1.1.24`)**: Diálogos de confirmação para ações destrutivas (excluir cadastro, cancelar pedido).
 * **`@radix-ui/react-dropdown-menu` (`^2.1.25`)**: Menu de ações em linhas de tabelas e perfil do usuário.
-* **`@radix-ui/react-select` (`^2.3.8`)**: Seletores acessíveis de unidades de medida, status e associações.
+* **`@radix-ui/react-select` (`^2.3.8`)**: Seletores acessíveis de unidades de medida, status, UF/Cidade e associações.
 * **`@radix-ui/react-popover` (`^1.2.0`)**: Popovers contextuais para filtros e seletores.
 * **`@radix-ui/react-separator` (`^1.1.16`)**: Divisores semânticos acessíveis.
-* **`@radix-ui/react-tabs` (`^1.1.22`)**: Abas de navegação interna.
+* **`@radix-ui/react-tabs` (`^1.1.22`)**: Abas de navegação interna (ex.: Dados Cadastrais vs. Endereços).
 * **`@radix-ui/react-tooltip` (`^1.3.0`)**: Dicas contextuais para ações e status.
 
 ---
@@ -103,15 +103,16 @@ Os seguintes componentes Radix foram adotados para garantir 100% de conformidade
 
 * **`typescript` (`^5`)**: Compilador de tipos estáticos para garantia de integridade em tempo de build.
 * **`@types/node` (`^20`)**, **`@types/react` (`^19`)**, **`@types/react-dom` (`^19`)**: Definições de tipagem para Node e React 19.
-* **`eslint` (`^9`)** e **`eslint-config-next` (`16.0.0`)**: Análise estática de código e boas práticas Next.js.
+* **`eslint` (`^9.39.5`)** e **`eslint-config-next` (`^16.4.3`)**: Análise estática de código e boas práticas Next.js.
 * **`@tailwindcss/postcss` (`^4`)**: Plugin PostCSS oficial para integração do Tailwind CSS v4.
 * **`tw-animate-css` (`^1.4.0`)**: Classes de animação suaves para diálogos e transições.
-* **`husky` (`^9.1.7`)**, **`@commitlint/cli` (`^20.1.0`)**, **`@commitlint/config-conventional` (`^20.0.0`)**, **`cz-conventional-changelog` (`^3.3.0`)**: Padronização de mensagens de commit seguindo Conventional Commits.
+* **`husky` (`^9.1.7`)**, **`@commitlint/cli` (`^20.1.0`)**, **`@commitlint/config-conventional` (`^20.0.0`)**, **`cz-conventional-changelog` (`^3.0.1`)**: Padronização de mensagens de commit seguindo Conventional Commits.
 
 ---
 
 ## 3. O que NÃO foi adicionado (Decisões de Engenharia Conscientes)
 
 1. **Sem Axios**: O cliente HTTP foi construído sobre a `fetch` API nativa com interceptors tipados em [`lib/api/client.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/api/client.ts), economizando bundle e aproveitando o ecossistema nativo do Next.js.
-2. **Sem bibliotecas externas de Máscara (ex.: react-input-mask)**: Máscaras foram implementadas em funções puras em [`lib/masks.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/masks.ts) sem incompatibilidade com React 19.
-3. **Sem bibliotecas de Moeda/Data pesadas (ex.: moment, date-fns, currency.js)**: Utilização estrita dos padrões nativos de navegador `Intl.NumberFormat` e `Intl.DateTimeFormat` em [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts).
+2. **Sem bibliotecas externas de Máscara (ex.: `react-input-mask`)**: Máscaras foram implementadas em funções puras em [`lib/masks.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/masks.ts) sem incompatibilidade com React 19 e com suporte nativo ao novo padrão de CNPJ alfanumérico.
+3. **Sem bibliotecas pesadas de Moeda ou Data (ex.: `moment`, `date-fns`, `currency.js`)**: Utilização estrita dos padrões nativos `Intl.NumberFormat` e `Intl.DateTimeFormat` em [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts).
+4. **Sem dependência de API externa para consulta de Estados e Municípios IBGE**: Os 27 Estados (UFs) e 5.570 municípios brasileiros estão empacotados localmente em formato compacto em [`features/addresses/data/ibge-locations.json`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/addresses/data/ibge-locations.json) e indexados em memória por [`features/addresses/utils/locations.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/addresses/utils/locations.ts), garantindo resposta instantânea ($O(1)$), 100% de paridade com a base do backend e funcionamento imune a indisponibilidades de serviços externos.

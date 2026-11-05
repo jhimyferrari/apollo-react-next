@@ -28,6 +28,17 @@ export const sellerSchema = z.object({
   phone: z.string().optional().nullable(),
   started_at: z.string().optional().nullable(),
   ended_at: z.string().optional().nullable(),
-});
+}).refine(
+  (data) => {
+    if (data.started_at && data.ended_at) {
+      return data.ended_at >= data.started_at;
+    }
+    return true;
+  },
+  {
+    message: "A data de término deve ser igual ou posterior à data de início",
+    path: ["ended_at"],
+  }
+);
 
 export type SellerFormData = z.infer<typeof sellerSchema>;

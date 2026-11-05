@@ -26,12 +26,20 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { maskDocument, maskPhone } from "@/lib/masks";
 import { useClients, useDeleteClient } from "../hooks/use-clients";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, Edit, Trash2, Plus, AlertCircle, Users } from "lucide-react";
 import type { ClientResource } from "../types";
 
 export function ClientTable() {
   const [page, setPage] = useState(1);
   const [clientToDelete, setClientToDelete] = useState<ClientResource | null>(null);
+
+  const { can } = usePermissions();
+  const canView = can("client.view");
+  const canCreate = can("client.create");
+  const canEdit = can("client.update");
+  const canDelete = can("client.delete");
+  const hasActions = canEdit || canDelete;
 
   const { data, isLoading, isError, error, refetch } = useClients(page);
   const deleteMutation = useDeleteClient();
@@ -49,8 +57,22 @@ export function ClientTable() {
     }
   };
 
+  if (!canView) {
+    return (
+      <div className="rounded-lg border border-border bg-card/60 p-8 text-center my-6">
+        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <h3 className="font-semibold text-foreground">
+          Visualização não permitida
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Você não possui permissão para visualizar a listagem de clientes.
+        </p>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <TableSkeleton rows={8} cols={6} />;
+    return <TableSkeleton rows={8} cols={hasActions ? 6 : 5} />;
   }
 
   if (isError) {
@@ -77,12 +99,14 @@ export function ClientTable() {
         title="Nenhum cliente cadastrado"
         description="Cadastre clientes para emitir pedidos de venda e gerenciar parceiros comerciais."
         action={
-          <Button asChild>
-            <Link href="/clients/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Cadastrar Cliente
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild>
+              <Link href="/clients/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Cadastrar Cliente
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -99,7 +123,9 @@ export function ClientTable() {
               <TableHead>CPF / CNPJ</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead className="w-24">Status</TableHead>
-              <TableHead className="w-16 text-center">Ações</TableHead>
+              {hasActions && (
+                <TableHead className="w-16 text-center">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -130,41 +156,47 @@ export function ClientTable() {
                 <TableCell>
                   <Badge
                     variant={client.status === "active" ? "default" : "secondary"}
-                    className="capitalize text-[10px]"
+                    className="text-[10px]"
                   >
-                    {client.status || "Ativo"}
+                    {client.status === "inactive" ? "Inativo" : "Ativo"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Opções</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href={`/clients/${client.id}`}
-                          className="cursor-pointer flex items-center"
-                        >
-                          <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                          Editar / Endereços
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                        onClick={() => setClientToDelete(client)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+                {hasActions && (
+                  <TableCell className="text-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Opções</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                        {canEdit && (
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/clients/${client.id}`}
+                              className="cursor-pointer flex items-center"
+                            >
+                              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Editar / Endereços
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        {canEdit && canDelete && <DropdownMenuSeparator />}
+                        {canDelete && (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive cursor-pointer"
+                            onClick={() => setClientToDelete(client)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

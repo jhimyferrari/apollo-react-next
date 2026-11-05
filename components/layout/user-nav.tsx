@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, Shield } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
 
 export function UserNav() {
   const { user, logout } = useAuth();

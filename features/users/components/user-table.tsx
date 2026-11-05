@@ -26,12 +26,20 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { formatDate } from "@/lib/formatters";
 import { useUsers, useDeleteUser } from "../hooks/use-users";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, ShieldCheck, Trash2, Plus, AlertCircle, Users } from "lucide-react";
 import type { UserResource } from "../types";
 
 export function UserTable() {
   const [page, setPage] = useState(1);
   const [userToDelete, setUserToDelete] = useState<UserResource | null>(null);
+
+  const { can } = usePermissions();
+  const canView = can("user.view");
+  const canCreate = can("user.create");
+  const canEdit = can("user.update");
+  const canDelete = can("user.delete");
+  const hasActions = canEdit || canDelete;
 
   const { data, isLoading, isError, error, refetch } = useUsers(page);
   const deleteMutation = useDeleteUser();
@@ -49,8 +57,22 @@ export function UserTable() {
     }
   };
 
+  if (!canView) {
+    return (
+      <div className="rounded-lg border border-border bg-card/60 p-8 text-center my-6">
+        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <h3 className="font-semibold text-foreground">
+          Visualização não permitida
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Você não possui permissão para visualizar a listagem de usuários.
+        </p>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <TableSkeleton rows={6} cols={5} />;
+    return <TableSkeleton rows={6} cols={hasActions ? 5 : 4} />;
   }
 
   if (isError) {
@@ -77,12 +99,14 @@ export function UserTable() {
         title="Nenhum usuário cadastrado"
         description="Cadastre operadores e administradores para gerenciar o acesso ao sistema."
         action={
-          <Button asChild>
-            <Link href="/users/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Cadastrar Usuário
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild>
+              <Link href="/users/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Cadastrar Usuário
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -98,7 +122,9 @@ export function UserTable() {
               <TableHead>E-mail</TableHead>
               <TableHead>Permissões</TableHead>
               <TableHead className="w-36">Cadastro</TableHead>
-              <TableHead className="w-16 text-center">Ações</TableHead>
+              {hasActions && (
+                <TableHead className="w-16 text-center">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,44 +140,60 @@ export function UserTable() {
                     {user.email}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      <ShieldCheck className="mr-1 h-3.5 w-3.5 text-primary" />
-                      {permCount} {permCount === 1 ? "permissão" : "permissões"}
-                    </Badge>
+                    {user.is_administrator ? (
+                      <Badge variant="default" className="text-xs">
+                        <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                        Administrador
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        <ShieldCheck className="mr-1 h-3.5 w-3.5 text-primary" />
+                        {permCount} {permCount === 1 ? "permissão" : "permissões"}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(user.created_at)}
                   </TableCell>
-                  <TableCell className="text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Opções</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/users/${user.id}`}
-                            className="cursor-pointer flex items-center"
-                          >
-                            <ShieldCheck className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Gerenciar Permissões
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => setUserToDelete(user)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                  {hasActions && (
+                    <TableCell className="text-center">
+                      {/* Administradores não têm permissões editáveis nem podem ser excluídos */}
+                      {!user.is_administrator && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Opções</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          {canEdit && (
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/users/${user.id}`}
+                                className="cursor-pointer flex items-center"
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Gerenciar Permissões
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
+                          {canEdit && canDelete && <DropdownMenuSeparator />}
+                          {canDelete && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                              onClick={() => setUserToDelete(user)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

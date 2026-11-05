@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { ClientForm } from "@/features/clients/components/client-form";
 import { useClient } from "@/features/clients/hooks/use-clients";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function EditClientPage({
@@ -61,15 +62,21 @@ export default function EditClientPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Editar: ${client.legal_name}`}
-        description={`Código #${client.number} • ${client.trade_name}`}
-      />
+    <PermissionGuard
+      permission="client.update"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para editar os dados deste cliente."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Editar: ${client.legal_name}`}
+          description={`Código #${client.number} • ${client.trade_name}`}
+        />
 
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-        <ClientForm initialData={client} />
+        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+          <ClientForm initialData={client} />
+        </div>
       </div>
-    </div>
+    </PermissionGuard>
   );
 }

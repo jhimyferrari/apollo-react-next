@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft, Save, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { useCreateSalesOrder } from "../hooks/use-sales-orders";
 import { useClients } from "@/features/clients/hooks/use-clients";
 import { useSellers } from "@/features/sellers/hooks/use-sellers";
 import { useProducts } from "@/features/products/hooks/use-products";
+import { maskStock } from "@/lib/masks";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 
 export function SalesOrderForm() {
@@ -39,11 +40,9 @@ export function SalesOrderForm() {
   const products = productsData?.data || [];
 
   const {
-    register,
     control,
     handleSubmit,
     setValue,
-    watch,
     setError,
     formState: { errors },
   } = useForm<SalesOrderFormData>({
@@ -60,7 +59,9 @@ export function SalesOrderForm() {
     name: "items",
   });
 
-  const watchedItems = watch("items") || [];
+  const clientIdValue = useWatch({ control, name: "client_id" });
+  const sellerIdValue = useWatch({ control, name: "seller_id" });
+  const watchedItems = useWatch({ control, name: "items" }) || [];
 
   // Calcula o total ao vivo
   const calculatedTotal = watchedItems.reduce((acc, item) => {
@@ -121,7 +122,7 @@ export function SalesOrderForm() {
             Cliente <span className="text-destructive">*</span>
           </Label>
           <Select
-            value={watch("client_id")}
+            value={clientIdValue}
             onValueChange={(val) =>
               setValue("client_id", val, { shouldValidate: true })
             }
@@ -147,7 +148,7 @@ export function SalesOrderForm() {
             Vendedor Responsável <span className="text-destructive">*</span>
           </Label>
           <Select
-            value={watch("seller_id")}
+            value={sellerIdValue}
             onValueChange={(val) =>
               setValue("seller_id", val, { shouldValidate: true })
             }
@@ -196,9 +197,6 @@ export function SalesOrderForm() {
 
         <div className="space-y-3">
           {fields.map((field, index) => {
-            const itemProduct = products.find(
-              (p) => p.id === watchedItems[index]?.product_id
-            );
             const itemQty = Number(
               watchedItems[index]?.quantity?.replace(",", ".") || 0
             );
@@ -209,9 +207,9 @@ export function SalesOrderForm() {
 
             return (
               <Card key={field.id} className="border border-border bg-card/60">
-                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                   {/* Número do item */}
-                  <div className="md:col-span-1 flex items-center justify-center font-mono text-xs text-muted-foreground">
+                  <div className="md:col-span-1 flex items-center justify-center font-mono text-xs text-muted-foreground pt-7">
                     #{index + 1}
                   </div>
 
@@ -234,6 +232,7 @@ export function SalesOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormFieldError error={errors.items?.[index]?.product_id} />
                   </div>
 
                   {/* Quantidade */}
@@ -241,9 +240,17 @@ export function SalesOrderForm() {
                     <Label className="text-xs font-medium">Qtd</Label>
                     <Input
                       placeholder="1"
-                      {...register(`items.${index}.quantity` as const)}
+                      value={watchedItems[index]?.quantity ?? ""}
+                      onChange={(e) => {
+                        setValue(
+                          `items.${index}.quantity`,
+                          maskStock(e.target.value),
+                          { shouldValidate: true }
+                        );
+                      }}
                       disabled={isSubmitting}
                     />
+                    <FormFieldError error={errors.items?.[index]?.quantity} />
                   </div>
 
                   {/* Preço Unitário (Visualização R$) */}
@@ -257,7 +264,7 @@ export function SalesOrderForm() {
                   </div>
 
                   {/* Subtotal e Remover */}
-                  <div className="md:col-span-2 flex items-center justify-between">
+                  <div className="md:col-span-2 flex items-center justify-between pt-5">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-muted-foreground uppercase font-semibold">
                         Subtotal

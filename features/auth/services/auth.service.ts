@@ -65,9 +65,6 @@ export const authService = {
     } finally {
       clearSession();
       removeToken();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
     }
   },
 };

@@ -3,49 +3,6 @@ import type { PermissionDomainGroup, PermissionDefinition } from "../types";
 
 export const permissionDomainGroups: PermissionDomainGroup[] = [
   {
-    id: "users",
-    name: "Usuários",
-    description: "Gestão de operadores e credenciais de acesso",
-    permissions: {
-      read: {
-        name: "user.view",
-        domain: "users",
-        module: "Usuários",
-        action: "read",
-        actionLabel: "Ler (Read)",
-        label: "Visualizar e listar usuários",
-        description: "Permite consultar a listagem e os detalhes cadastrais dos operadores",
-      },
-      create: {
-        name: "user.create",
-        domain: "users",
-        module: "Usuários",
-        action: "create",
-        actionLabel: "Criar (Create)",
-        label: "Cadastrar novos usuários",
-        description: "Permite registrar novos operadores com e-mail e senha de acesso",
-      },
-      update: {
-        name: "user.update",
-        domain: "users",
-        module: "Usuários",
-        action: "update",
-        actionLabel: "Editar (Update)",
-        label: "Editar permissões de usuários",
-        description: "Permite alterar e conceder novos privilégios de acesso aos usuários",
-      },
-      delete: {
-        name: "user.delete",
-        domain: "users",
-        module: "Usuários",
-        action: "delete",
-        actionLabel: "Deletar (Delete)",
-        label: "Excluir usuários",
-        description: "Permite remover definitivamente operadores da organização",
-      },
-    },
-  },
-  {
     id: "products",
     name: "Produtos",
     description: "Catálogo de mercadorias, precificação e estoque",
@@ -405,7 +362,11 @@ export const userCreateSchema = z.object({
   password: z
     .string()
     .min(1, "A senha é obrigatória")
-    .min(8, "A senha deve conter no mínimo 8 caracteres"),
+    .min(8, "A senha deve conter no mínimo 8 caracteres")
+    .regex(/[A-Z]/, "A senha deve conter ao menos uma letra maiúscula")
+    .regex(/[a-z]/, "A senha deve conter ao menos uma letra minúscula")
+    .regex(/[0-9]/, "A senha deve conter ao menos um número")
+    .regex(/[^A-Za-z0-9]/, "A senha deve conter ao menos um caractere especial"),
   permissions: z.array(z.string()).optional(),
 });
 

@@ -22,12 +22,14 @@ import {
   ShoppingCart,
   ShoppingBag,
   Eye,
+  EyeOff,
   Plus,
   Pencil,
   Trash2,
   CheckCheck,
   X,
   BookOpen,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,9 +41,7 @@ import {
   permissionDomainGroups,
   availablePermissions,
   userCreateSchema,
-  userUpdateSchema,
   type UserCreateFormData,
-  type UserUpdateFormData,
 } from "../schemas/user.schema";
 import { useCreateUser, useUpdateUser } from "../hooks/use-users";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
@@ -98,6 +98,15 @@ const ACTION_CONFIG: Record<
   },
 };
 
+/** Extrai a mensagem de erro de permissões retornada pela API (`permission` ou `permissions`). */
+function extractPermissionsError(fields: Record<string, string[]>): string | null {
+  for (const key of ["permission", "permissions"]) {
+    if (fields[key]?.length) return fields[key][0];
+  }
+  const nested = Object.entries(fields).find(([key]) => key.startsWith("permissions."));
+  return nested?.[1]?.[0] ?? null;
+}
+
 export function UserForm({ initialData }: UserFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialData);
@@ -105,11 +114,19 @@ export function UserForm({ initialData }: UserFormProps) {
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
 
-  // Permissões iniciais do usuário
-  const initialPermissionNames = initialData?.permissions?.map((p) => p.name) || [];
+  // Permissões iniciais do usuário (exclui permissões de controle de usuário que não são atribuíveis a operadores)
+  const availablePermissionNames = new Set(availablePermissions.map((p) => p.name));
+  const initialPermissionNames = (initialData?.permissions?.map((p) => p.name) || []).filter(
+    (name) => availablePermissionNames.has(name)
+  );
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
     initialPermissionNames
   );
+  const [showPassword, setShowPassword] = useState(false);
+  const [permissionsError, setPermissionsError] = useState<string | null>(null);
+
+  // Administradores têm acesso total e suas permissões não podem ser modificadas
+  const isAdminTarget = Boolean(initialData?.is_administrator);
 
   const createForm = useForm<UserCreateFormData>({
     resolver: zodResolver(userCreateSchema),
@@ -118,13 +135,6 @@ export function UserForm({ initialData }: UserFormProps) {
       email: "",
       password: "",
       permissions: [],
-    },
-  });
-
-  const updateForm = useForm<UserUpdateFormData>({
-    resolver: zodResolver(userUpdateSchema),
-    defaultValues: {
-      permissions: initialPermissionNames,
     },
   });
 
@@ -176,6 +186,7 @@ export function UserForm({ initialData }: UserFormProps) {
   };
 
   const handleCreateSubmit = async (formData: UserCreateFormData) => {
+    setPermissionsError(null);
     try {
       await createMutation.mutateAsync({
         name: formData.name.trim(),
@@ -189,12 +200,15 @@ export function UserForm({ initialData }: UserFormProps) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
         applyApiValidationErrors(parsed, createForm.setError);
+        setPermissionsError(extractPermissionsError(parsed.fields));
       }
     }
   };
 
   const handleUpdateSubmit = async () => {
     if (!initialData) return;
+    if (isAdminTarget) return;
+    setPermissionsError(null);
     try {
       await updateMutation.mutateAsync({
         id: initialData.id,
@@ -207,7 +221,10 @@ export function UserForm({ initialData }: UserFormProps) {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, updateForm.setError);
+        // O backend retorna a chave `permission` (singular), que não é um campo visível do formulário
+        setPermissionsError(
+          extractPermissionsError(parsed.fields) || parsed.message || "Não foi possível salvar as permissões."
+        );
       }
     }
   };
@@ -235,15 +252,34 @@ export function UserForm({ initialData }: UserFormProps) {
             </CardContent>
           </Card>
 
-          {/* Painel de Permissões por Domínio */}
-          <PermissionsMatrix
-            selectedPermissions={selectedPermissions}
-            onTogglePermission={togglePermission}
-            onToggleDomain={toggleDomainPermissions}
-            onSelectAll={selectAll}
-            onDeselectAll={deselectAll}
-            onSelectOnlyRead={selectOnlyRead}
-          />
+          {isAdminTarget ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 flex items-start gap-3">
+              <ShieldCheck className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Usuário Administrador
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Administradores possuem acesso total ao sistema e suas permissões não
+                  podem ser modificadas.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <PermissionsErrorAlert message={permissionsError} />
+
+              {/* Painel de Permissões por Domínio */}
+              <PermissionsMatrix
+                selectedPermissions={selectedPermissions}
+                onTogglePermission={togglePermission}
+                onToggleDomain={toggleDomainPermissions}
+                onSelectAll={selectAll}
+                onDeselectAll={deselectAll}
+                onSelectOnlyRead={selectOnlyRead}
+              />
+            </>
+          )}
 
           <div className="flex items-center justify-between gap-3 pt-4 border-t border-border">
             <Button asChild variant="outline" type="button" disabled={isSubmitting}>
@@ -253,23 +289,25 @@ export function UserForm({ initialData }: UserFormProps) {
               </Link>
             </Button>
 
-            <Button
-              type="button"
-              onClick={handleUpdateSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando Permissões...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Salvar Permissões
-                </>
-              )}
-            </Button>
+            {!isAdminTarget && (
+              <Button
+                type="button"
+                onClick={handleUpdateSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando Permissões...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Salvar Permissões
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -327,15 +365,28 @@ export function UserForm({ initialData }: UserFormProps) {
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
-                  placeholder="Mínimo de 8 caracteres"
-                  className="pl-9"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mín. 8 caracteres, maiúscula, minúscula, número e símbolo"
+                  className="pl-9 pr-10"
                   {...createForm.register("password")}
                   disabled={isSubmitting}
                 />
+                <button
+                  type="button"
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                  title={showPassword ? "Ocultar senha" : "Ver senha"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                O operador poderá alterar esta senha posteriormente.
+                Deve conter ao menos 8 caracteres, incluindo letras maiúsculas, minúsculas, números e símbolos.
               </p>
               <FormFieldError error={createForm.formState.errors.password} />
             </div>
@@ -343,6 +394,7 @@ export function UserForm({ initialData }: UserFormProps) {
 
           {/* Permissões Iniciais no Cadastro */}
           <div className="pt-4 border-t border-border">
+            <PermissionsErrorAlert message={permissionsError} />
             <PermissionsMatrix
               selectedPermissions={selectedPermissions}
               onTogglePermission={togglePermission}
@@ -381,8 +433,21 @@ export function UserForm({ initialData }: UserFormProps) {
   );
 }
 
+function PermissionsErrorAlert({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+    >
+      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 /**
- * Matriz de Permissões: organiza os 9 domínios nos 4 tipos de permissões
+ * Matriz de Permissões: organiza os 8 domínios operacionais nos 4 tipos de permissões
  * [Ler (Read), Criar (Create), Editar (Update), Deletar (Delete)]
  */
 function PermissionsMatrix({

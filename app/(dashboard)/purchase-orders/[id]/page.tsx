@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { PurchaseOrderDetails } from "@/features/purchase-orders/components/purchase-order-details";
 import { usePurchaseOrder } from "@/features/purchase-orders/hooks/use-purchase-orders";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function ViewPurchaseOrderPage({
@@ -61,13 +62,19 @@ export default function ViewPurchaseOrderPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Pedido de Compra #${order.number}`}
-        description={`Fornecedor: ${order.supplier?.legal_name || "N/A"}`}
-      />
+    <PermissionGuard
+      permission="purchase-order.view"
+      title="Acesso Restrito"
+      description="Você não possui permissão para visualizar os detalhes deste pedido de compra."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Pedido de Compra #${order.number}`}
+          description={`Fornecedor: ${order.supplier?.legal_name || "N/A"}`}
+        />
 
-      <PurchaseOrderDetails order={order} />
-    </div>
+        <PurchaseOrderDetails order={order} />
+      </div>
+    </PermissionGuard>
   );
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { UserForm } from "@/features/users/components/user-form";
 import { useUser } from "@/features/users/hooks/use-users";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function EditUserPage({
@@ -61,15 +62,21 @@ export default function EditUserPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Permissões: ${user.name}`}
-        description={`${user.email} • Controle de acesso aos 9 módulos do sistema`}
-      />
+    <PermissionGuard
+      permission="user.update"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para editar os privilégios deste usuário."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Permissões: ${user.name}`}
+          description={`${user.email} • Controle de acesso aos módulos operacionais do sistema`}
+        />
 
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-        <UserForm initialData={user} />
+        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+          <UserForm initialData={user} />
+        </div>
       </div>
-    </div>
+    </PermissionGuard>
   );
 }
