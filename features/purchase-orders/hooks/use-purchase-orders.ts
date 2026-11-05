@@ -74,6 +74,7 @@ export function useConfirmPurchaseOrder() {
     mutationFn: (id: string) => purchaseOrderService.confirm(id),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(res?.message || "Pedido de compra confirmado! Estoque atualizado.");
     },
     onError: (err) => {
@@ -87,10 +88,23 @@ export function useReopenPurchaseOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => purchaseOrderService.reopen(id),
+    mutationFn: (params: string | { id: string; reason?: string }) => {
+      const id = typeof params === "string" ? params : params.id;
+      const reason = typeof params === "string" ? undefined : params.reason;
+      return purchaseOrderService.reopen(id, reason);
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(res?.message || "Pedido de compra reaberto!");
+
+      const outdated = res?.data?.outdated_prices;
+      if (outdated && outdated.length > 0) {
+        const names = outdated.map((item) => item.product_name).join(", ");
+        toast.warning(
+          `Atenção: ${outdated.length} produto(s) possuem preço de custo atualizado no catálogo (${names}). Revise os valores no novo rascunho.`
+        );
+      }
     },
     onError: (err) => {
       const parsed = parseApiError(err);
@@ -107,6 +121,7 @@ export function useCancelPurchaseOrder() {
       purchaseOrderService.cancel(id, reason),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(res?.message || "Pedido de compra cancelado!");
     },
     onError: (err) => {

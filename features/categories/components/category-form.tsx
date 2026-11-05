@@ -44,15 +44,18 @@ export function CategoryForm({ initialData }: CategoryFormProps) {
 
   const onSubmit = async (formData: CategoryFormData) => {
     try {
+      const trimmedName = formData.name.trim();
+      const trimmedDescription = formData.description?.trim() || undefined;
+
       if (isEditing && initialData) {
         const currentPayload: UpdateCategoryRequest = {
-          name: formData.name.trim(),
-          description: formData.description?.trim() || "",
+          name: trimmedName,
+          description: trimmedDescription || null,
         };
 
         const originalPayload: UpdateCategoryRequest = {
           name: initialData.name,
-          description: initialData.description || "",
+          description: initialData.description || null,
         };
 
         const diff = calculateDiff(originalPayload, currentPayload);
@@ -62,14 +65,19 @@ export function CategoryForm({ initialData }: CategoryFormProps) {
           return;
         }
 
+        const patchPayload: UpdateCategoryRequest = {
+          name: trimmedName,
+          ...(trimmedDescription ? { description: trimmedDescription } : {}),
+        };
+
         await updateMutation.mutateAsync({
           id: initialData.id,
-          data: diff,
+          data: patchPayload,
         });
       } else {
         await createMutation.mutateAsync({
-          name: formData.name.trim(),
-          description: formData.description?.trim() || "",
+          name: trimmedName,
+          ...(trimmedDescription ? { description: trimmedDescription } : {}),
         });
       }
 

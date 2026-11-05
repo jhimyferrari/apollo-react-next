@@ -13,7 +13,8 @@ export const addressSchema = z.object({
       const digits = onlyDigits(val);
       return digits.length === 8;
     }, "O CEP deve conter 8 dígitos numéricos"),
-  city_ibge_code: z.string().min(1, "Código IBGE do município é obrigatório"),
+  uf_ibge_code: z.string().min(1, "Selecione a UF"),
+  city_ibge_code: z.string().min(1, "Selecione a cidade"),
   is_default: z.boolean().optional(),
 });
 

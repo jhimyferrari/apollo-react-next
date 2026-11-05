@@ -1,9 +1,11 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { supplierService } from "@/features/suppliers/services/supplier.service";
 import type {
   PurchaseOrderResource,
   StorePurchaseOrderRequest,
   UpdatePurchaseOrderRequest,
+  ReopenPurchaseOrderResponse,
 } from "../types";
 
 export const purchaseOrderService = {
@@ -14,10 +16,47 @@ export const purchaseOrderService = {
     );
   },
 
-  getById(id: string) {
-    return apiClient.get<{ data: PurchaseOrderResource }>(
+  async getById(id: string): Promise<{ data: PurchaseOrderResource }> {
+    const res = await apiClient.get<{ data: PurchaseOrderResource }>(
       `/v1/purchase-orders/${id}`
     );
+    const order = res?.data;
+    if (!order) return res;
+
+    let enriched = { ...order };
+
+    // O endpoint GET /v1/purchase-orders/{id} pode não carregar supplier e items via eager load.
+    // Caso estejam ausentes, enriquecemos a partir da listagem e/ou serviço de fornecedor.
+    if (enriched.items === undefined || enriched.supplier === undefined) {
+      try {
+        const listRes = await apiClient.get<
+          PaginatedResponse<PurchaseOrderResource>
+        >("/v1/purchase-orders", { page: 1 });
+        const match = listRes?.data?.find((item) => item.id === id);
+        if (match) {
+          enriched = {
+            ...enriched,
+            supplier: enriched.supplier ?? match.supplier,
+            items: enriched.items ?? match.items,
+          };
+        }
+      } catch {
+        // Continua para tentativa individual
+      }
+    }
+
+    if (!enriched.supplier && enriched.supplier_id) {
+      try {
+        const supplierRes = await supplierService.getById(enriched.supplier_id);
+        if (supplierRes?.data) {
+          enriched.supplier = supplierRes.data;
+        }
+      } catch {
+        // Fallback silencioso
+      }
+    }
+
+    return { data: enriched };
   },
 
   create(data: StorePurchaseOrderRequest) {
@@ -37,16 +76,18 @@ export const purchaseOrderService = {
     );
   },
 
-  reopen(id: string) {
-    return apiClient.patch<{ message: string }>(
-      `/v1/purchase-orders/${id}/reopen`
+  reopen(id: string, reason?: string) {
+    return apiClient.patch<ReopenPurchaseOrderResponse>(
+      `/v1/purchase-orders/${id}/reopen`,
+      reason ? { reason } : undefined
     );
   },
 
   cancel(id: string, reason?: string) {
+    const cleanReason = reason?.trim() || null;
     return apiClient.patch<{ message: string }>(
       `/v1/purchase-orders/${id}/cancel`,
-      { cancellation_reason: reason || null }
+      { reason: cleanReason, cancellation_reason: cleanReason }
     );
   },
 

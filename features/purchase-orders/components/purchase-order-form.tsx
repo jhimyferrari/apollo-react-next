@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft, Save, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
 import { useCreatePurchaseOrder } from "../hooks/use-purchase-orders";
 import { useSuppliers } from "@/features/suppliers/hooks/use-suppliers";
 import { useProducts } from "@/features/products/hooks/use-products";
+import { maskStock } from "@/lib/masks";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 
 export function PurchaseOrderForm() {
@@ -39,11 +40,9 @@ export function PurchaseOrderForm() {
   const products = productsData?.data || [];
 
   const {
-    register,
     control,
     handleSubmit,
     setValue,
-    watch,
     setError,
     formState: { errors },
   } = useForm<PurchaseOrderFormData>({
@@ -59,7 +58,8 @@ export function PurchaseOrderForm() {
     name: "items",
   });
 
-  const watchedItems = watch("items") || [];
+  const supplierIdValue = useWatch({ control, name: "supplier_id" });
+  const watchedItems = useWatch({ control, name: "items" }) || [];
 
   // Calcula o total ao vivo
   const calculatedTotal = watchedItems.reduce((acc, item) => {
@@ -118,7 +118,7 @@ export function PurchaseOrderForm() {
             Fornecedor <span className="text-destructive">*</span>
           </Label>
           <Select
-            value={watch("supplier_id")}
+            value={supplierIdValue}
             onValueChange={(val) =>
               setValue("supplier_id", val, { shouldValidate: true })
             }
@@ -177,9 +177,9 @@ export function PurchaseOrderForm() {
 
             return (
               <Card key={field.id} className="border border-border bg-card/60">
-                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                   {/* Número do item */}
-                  <div className="md:col-span-1 flex items-center justify-center font-mono text-xs text-muted-foreground">
+                  <div className="md:col-span-1 flex items-center justify-center font-mono text-xs text-muted-foreground pt-7">
                     #{index + 1}
                   </div>
 
@@ -202,6 +202,7 @@ export function PurchaseOrderForm() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormFieldError error={errors.items?.[index]?.product_id} />
                   </div>
 
                   {/* Quantidade */}
@@ -209,9 +210,17 @@ export function PurchaseOrderForm() {
                     <Label className="text-xs font-medium">Qtd</Label>
                     <Input
                       placeholder="1"
-                      {...register(`items.${index}.quantity` as const)}
+                      value={watchedItems[index]?.quantity ?? ""}
+                      onChange={(e) => {
+                        setValue(
+                          `items.${index}.quantity`,
+                          maskStock(e.target.value),
+                          { shouldValidate: true }
+                        );
+                      }}
                       disabled={isSubmitting}
                     />
+                    <FormFieldError error={errors.items?.[index]?.quantity} />
                   </div>
 
                   {/* Preço de Custo (Visualização R$) */}
@@ -225,7 +234,7 @@ export function PurchaseOrderForm() {
                   </div>
 
                   {/* Subtotal e Remover */}
-                  <div className="md:col-span-2 flex items-center justify-between">
+                  <div className="md:col-span-2 flex items-center justify-between pt-5">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-muted-foreground uppercase font-semibold">
                         Subtotal

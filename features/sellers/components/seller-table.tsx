@@ -26,12 +26,20 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { maskDocument, maskPhone } from "@/lib/masks";
 import { useSellers, useDeleteSeller } from "../hooks/use-sellers";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, Edit, Trash2, Plus, AlertCircle, Briefcase } from "lucide-react";
 import type { SellerResource } from "../types";
 
 export function SellerTable() {
   const [page, setPage] = useState(1);
   const [sellerToDelete, setSellerToDelete] = useState<SellerResource | null>(null);
+
+  const { can } = usePermissions();
+  const canView = can("seller.view");
+  const canCreate = can("seller.create");
+  const canEdit = can("seller.update");
+  const canDelete = can("seller.delete");
+  const hasActions = canEdit || canDelete;
 
   const { data, isLoading, isError, error, refetch } = useSellers(page);
   const deleteMutation = useDeleteSeller();
@@ -49,8 +57,22 @@ export function SellerTable() {
     }
   };
 
+  if (!canView) {
+    return (
+      <div className="rounded-lg border border-border bg-card/60 p-8 text-center my-6">
+        <Briefcase className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <h3 className="font-semibold text-foreground">
+          Visualização não permitida
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Você não possui permissão para visualizar a listagem de vendedores.
+        </p>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <TableSkeleton rows={8} cols={6} />;
+    return <TableSkeleton rows={8} cols={hasActions ? 6 : 5} />;
   }
 
   if (isError) {
@@ -77,12 +99,14 @@ export function SellerTable() {
         title="Nenhum vendedor cadastrado"
         description="Cadastre vendedores para vinculá-los aos pedidos de venda e gerenciar sua equipe."
         action={
-          <Button asChild>
-            <Link href="/sellers/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Cadastrar Vendedor
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild>
+              <Link href="/sellers/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Cadastrar Vendedor
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -99,7 +123,9 @@ export function SellerTable() {
               <TableHead>CPF / CNPJ</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead className="w-24">Status</TableHead>
-              <TableHead className="w-16 text-center">Ações</TableHead>
+              {hasActions && (
+                <TableHead className="w-16 text-center">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -130,41 +156,47 @@ export function SellerTable() {
                 <TableCell>
                   <Badge
                     variant={seller.status === "active" ? "default" : "secondary"}
-                    className="capitalize text-[10px]"
+                    className="text-[10px]"
                   >
-                    {seller.status || "Ativo"}
+                    {seller.status === "inactive" ? "Inativo" : "Ativo"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Opções</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href={`/sellers/${seller.id}`}
-                          className="cursor-pointer flex items-center"
-                        >
-                          <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                          Editar / Endereços
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                        onClick={() => setSellerToDelete(seller)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+                {hasActions && (
+                  <TableCell className="text-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Opções</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                        {canEdit && (
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/sellers/${seller.id}`}
+                              className="cursor-pointer flex items-center"
+                            >
+                              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Editar / Endereços
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        {canEdit && canDelete && <DropdownMenuSeparator />}
+                        {canDelete && (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive cursor-pointer"
+                            onClick={() => setSellerToDelete(seller)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

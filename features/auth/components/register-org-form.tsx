@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, Building2, Lock, Mail, User } from "lucide-react";
@@ -28,7 +28,7 @@ export function RegisterOrgForm() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     setError,
     formState: { errors },
   } = useForm<RegisterOrganizationFormData>({
@@ -41,7 +41,7 @@ export function RegisterOrgForm() {
     },
   });
 
-  const docValue = watch("document");
+  const docValue = useWatch({ control, name: "document" });
 
   const onSubmit = async (data: RegisterOrganizationFormData) => {
     setIsLoading(true);

@@ -14,6 +14,10 @@ import {
   ShoppingCart,
   ShoppingBag,
   ShieldCheck,
+  LineChart,
+  UserCheck,
+  PackageSearch,
+  ReceiptText,
 } from "lucide-react";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { cn } from "@/lib/utils";
@@ -101,6 +105,35 @@ const navigationItems: NavGroup[] = [
         href: "/suppliers",
         icon: Truck,
         permission: "supplier.view",
+      },
+    ],
+  },
+  {
+    title: "Relatórios",
+    items: [
+      {
+        name: "Vendas",
+        href: "/reports/sales/summary",
+        icon: LineChart,
+        permission: "sales-order.view",
+      },
+      {
+        name: "Vendas por Produto",
+        href: "/reports/sales/by-product",
+        icon: PackageSearch,
+        permission: "sales-order.view",
+      },
+      {
+        name: "Vendas por Vendedor",
+        href: "/reports/sales/by-seller",
+        icon: UserCheck,
+        permission: "sales-order.view",
+      },
+      {
+        name: "Compras",
+        href: "/reports/purchases/summary",
+        icon: ReceiptText,
+        permission: "purchase-order.view",
       },
     ],
   },

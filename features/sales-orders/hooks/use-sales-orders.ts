@@ -70,6 +70,7 @@ export function useConfirmSalesOrder() {
     mutationFn: (id: string) => salesOrderService.confirm(id),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(res?.message || "Pedido de venda confirmado!");
     },
     onError: (err) => {
@@ -83,10 +84,23 @@ export function useReopenSalesOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => salesOrderService.reopen(id),
+    mutationFn: (params: string | { id: string; reason?: string }) => {
+      const id = typeof params === "string" ? params : params.id;
+      const reason = typeof params === "string" ? undefined : params.reason;
+      return salesOrderService.reopen(id, reason);
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(res?.message || "Pedido reaberto com sucesso!");
+
+      const outdated = res?.data?.outdated_prices;
+      if (outdated && outdated.length > 0) {
+        const names = outdated.map((item) => item.product_name).join(", ");
+        toast.warning(
+          `Atenção: ${outdated.length} produto(s) possuem preço atualizado no catálogo (${names}). Revise os valores no novo rascunho.`
+        );
+      }
     },
     onError: (err) => {
       const parsed = parseApiError(err);
@@ -103,6 +117,7 @@ export function useCancelSalesOrder() {
       salesOrderService.cancel(id, reason),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(res?.message || "Pedido cancelado com sucesso!");
     },
     onError: (err) => {

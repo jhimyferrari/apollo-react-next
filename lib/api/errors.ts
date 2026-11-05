@@ -14,7 +14,7 @@ export function parseApiError(
   let statusCode = fallbackStatusCode;
   let code = "UNKNOWN_ERROR";
   let message = "Ocorreu um erro inesperado. Por favor, tente novamente.";
-  let fields: Record<string, string[]> = {};
+  const fields: Record<string, string[]> = {};
 
   if (typeof error === "object" && error !== null) {
     const errObj = error as Record<string, unknown>;
@@ -73,32 +73,67 @@ export function parseApiError(
       code = "NOT_FOUND";
     }
 
-    // Heurísticas adicionais para mapear campos quando a API não retorna a chave 'fields' estruturada
-    const lowerMsg = message.toLowerCase();
-    if (
-      !fields.password &&
-      (code === "INVALID_PASSWORD" || lowerMsg.includes("password") || lowerMsg.includes("senha"))
-    ) {
-      fields.password = [message];
+    // Normaliza chave singular 'permission' vinda do backend para 'permissions'
+    if (fields.permission && !fields.permissions) {
+      fields.permissions = fields.permission;
     }
+
+    // Heurísticas adicionais para mapear campos quando a API retorna 422 / DUPLICATE_FIELD / INVALID_PASSWORD sem 'fields' estruturado
     if (
-      !fields.document &&
-      (lowerMsg.includes("document") || lowerMsg.includes("cpf") || lowerMsg.includes("cnpj"))
+      statusCode === 422 ||
+      code === "VALIDATION_ERROR" ||
+      code === "INVALID_PASSWORD" ||
+      code === "DUPLICATE_FIELD"
     ) {
-      fields.document = [message];
-    }
-    if (!fields.email && (lowerMsg.includes("email") || lowerMsg.includes("e-mail"))) {
-      fields.email = [message];
+      const lowerMsg = message.toLowerCase();
+      if (
+        !fields.password &&
+        (code === "INVALID_PASSWORD" || lowerMsg.includes("password") || lowerMsg.includes("senha"))
+      ) {
+        fields.password = [message];
+      }
+      if (
+        !fields.document &&
+        (lowerMsg.includes("document") || lowerMsg.includes("cpf") || lowerMsg.includes("cnpj"))
+      ) {
+        fields.document = [message];
+      }
+      if (!fields.email && (lowerMsg.includes("email") || lowerMsg.includes("e-mail"))) {
+        fields.email = [message];
+      }
+      if (
+        !fields.state_registration &&
+        (lowerMsg.includes("state_registration") || lowerMsg.includes("inscrição estadual"))
+      ) {
+        fields.state_registration = [message];
+      }
+      if (!fields.ean && lowerMsg.includes("ean")) {
+        fields.ean = [message];
+      }
+      if (!fields.ncm && lowerMsg.includes("ncm")) {
+        fields.ncm = [message];
+      }
+      if (
+        !fields.name &&
+        !lowerMsg.includes("razão") &&
+        !lowerMsg.includes("fantasia") &&
+        (lowerMsg.includes("campo nome") || lowerMsg.includes("field name") || lowerMsg.includes("`name`"))
+      ) {
+        fields.name = [message];
+      }
     }
   } else if (typeof error === "string") {
     message = error;
   }
 
+  const hasFieldErrors = Object.keys(fields).length > 0;
+
   const isValidationError =
-    code === "VALIDATION_ERROR" ||
-    code === "INVALID_PASSWORD" ||
-    statusCode === 422 ||
-    Object.keys(fields).length > 0;
+    hasFieldErrors &&
+    (code === "VALIDATION_ERROR" ||
+      code === "INVALID_PASSWORD" ||
+      code === "DUPLICATE_FIELD" ||
+      statusCode === 422);
 
   const isUnauthenticated =
     code === "UNAUTHENTICATED" || statusCode === 401;

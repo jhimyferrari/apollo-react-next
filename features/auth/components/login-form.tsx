@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2, Building2, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export function LoginForm() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     setError,
     formState: { errors },
   } = useForm<LoginFormData>({
@@ -34,7 +34,7 @@ export function LoginForm() {
     },
   });
 
-  const organizationDoc = watch("organization_document");
+  const organizationDoc = useWatch({ control, name: "organization_document" });
 
   const onSubmit = async (data: LoginFormData) => {
     try {

@@ -31,6 +31,8 @@ export interface UserResource {
   id: string;
   name: string;
   email: string;
+  /** Quando `true`, as permissões não podem ser modificadas (administrador da organização). */
+  is_administrator?: boolean;
   permissions?: PermissionResource[];
   created_at: string | null;
   updated_at: string | null;

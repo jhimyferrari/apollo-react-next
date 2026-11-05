@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { SupplierForm } from "@/features/suppliers/components/supplier-form";
 import { useSupplier } from "@/features/suppliers/hooks/use-suppliers";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function EditSupplierPage({
@@ -61,15 +62,21 @@ export default function EditSupplierPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Editar: ${supplier.legal_name}`}
-        description={`Código #${supplier.number} • ${supplier.trade_name}`}
-      />
+    <PermissionGuard
+      permission="supplier.update"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para editar os dados deste fornecedor."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Editar: ${supplier.legal_name}`}
+          description={`Código #${supplier.number} • ${supplier.trade_name}`}
+        />
 
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-        <SupplierForm initialData={supplier} />
+        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+          <SupplierForm initialData={supplier} />
+        </div>
       </div>
-    </div>
+    </PermissionGuard>
   );
 }

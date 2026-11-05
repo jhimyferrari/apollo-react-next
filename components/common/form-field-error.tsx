@@ -1,9 +1,7 @@
 import React from "react";
 import type { FieldError, FieldErrorsImpl, Merge } from "react-hook-form";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface FormFieldErrorProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error?:
     | string
     | string[]

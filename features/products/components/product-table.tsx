@@ -25,6 +25,8 @@ import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
+import { formatQuantity } from "@/lib/formatters";
+import { maskNCM } from "@/lib/masks";
 import { useProducts, useDeleteProduct } from "../hooks/use-products";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, Edit, Trash2, Plus, AlertCircle, Package } from "lucide-react";
@@ -142,9 +144,13 @@ export function ProductTable() {
                   ? String((product.sale_price as Record<string, unknown>).amount|| "0")
                   : String(product.sale_price || "0");
 
+              const rawStock =
+                typeof product.stock_quantity === "object" && product.stock_quantity !== null
+                  ? String((product.stock_quantity as Record<string, unknown>).amount ?? "0")
+                  : product.stock_quantity;
               const stockQtyStr =
-                product.stock_quantity !== null && product.stock_quantity !== undefined
-                  ? String(product.stock_quantity)
+                rawStock !== null && rawStock !== undefined
+                  ? formatQuantity(rawStock)
                   : "-";
               return (
                 <TableRow key={product.id}>
@@ -159,7 +165,7 @@ export function ProductTable() {
                       </span>
                       {product.ncm?.code && (
                         <span className="text-[11px] text-muted-foreground">
-                          NCM: {product.ncm.code}
+                          NCM: {maskNCM(product.ncm.code)}
                         </span>
                       )}
                     </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import React, { useEffect, useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -11,6 +11,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +25,14 @@ import { FormFieldError } from "@/components/common/form-field-error";
 import { addressSchema, type AddressFormData } from "../schemas/address.schema";
 import { useCreateAddress, useUpdateAddress } from "../hooks/use-addresses";
 import type { AddressOwnerType } from "../services/address.service";
-import type { AddressResource } from "../types";
+import type { AddressResource, UpdateAddressRequest } from "../types";
+import {
+  UFS,
+  getCitiesByUf,
+  resolveAddressUfIbgeCode,
+} from "../utils/locations";
 import { maskCEP, onlyDigits } from "@/lib/masks";
+import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 import { Loader2, MapPin } from "lucide-react";
 
@@ -47,7 +60,7 @@ export function AddressDialog({
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     reset,
     setError,
     formState: { errors },
@@ -59,21 +72,38 @@ export function AddressDialog({
       neighborhood: "",
       complement: "",
       cep: "",
+      uf_ibge_code: "",
       city_ibge_code: "",
+      is_default: false,
     },
   });
 
-  const cepValue = watch("cep");
+  const cepValue = useWatch({ control, name: "cep" });
+  const ufValue = useWatch({ control, name: "uf_ibge_code" });
+  const cityIbgeValue = useWatch({ control, name: "city_ibge_code" });
+  const isDefaultValue = useWatch({ control, name: "is_default" });
+
+  const citiesForSelectedUf = useMemo(
+    () => getCitiesByUf(ufValue),
+    [ufValue]
+  );
 
   useEffect(() => {
     if (initialData) {
+      const resolvedUf = resolveAddressUfIbgeCode(initialData);
+      const resolvedCityIbge = String(
+        initialData.city?.ibge_code || initialData.city_ibge_code || ""
+      ).trim();
+
       reset({
         street: initialData.street || "",
         number: initialData.number || "",
         neighborhood: initialData.neighborhood || "",
         complement: initialData.complement || "",
         cep: maskCEP(initialData.cep || ""),
-        city_ibge_code: String(initialData.city_ibge_code || ""),
+        uf_ibge_code: resolvedUf,
+        city_ibge_code: resolvedCityIbge,
+        is_default: Boolean(initialData.is_default),
       });
     } else {
       reset({
@@ -82,12 +112,25 @@ export function AddressDialog({
         neighborhood: "",
         complement: "",
         cep: "",
+        uf_ibge_code: "",
         city_ibge_code: "",
+        is_default: false,
       });
     }
   }, [initialData, reset, open]);
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  const handleUfChange = (newUfCode: string) => {
+    setValue("uf_ibge_code", newUfCode, { shouldValidate: true });
+    if (cityIbgeValue && !cityIbgeValue.startsWith(newUfCode)) {
+      setValue("city_ibge_code", "", { shouldValidate: false });
+    }
+  };
+
+  const handleCityChange = (newCityIbgeCode: string) => {
+    setValue("city_ibge_code", newCityIbgeCode, { shouldValidate: true });
+  };
 
   const onSubmit = async (data: AddressFormData) => {
     try {
@@ -98,12 +141,32 @@ export function AddressDialog({
         complement: data.complement?.trim() || null,
         cep: onlyDigits(data.cep),
         city_ibge_code: data.city_ibge_code.trim(),
+        is_default: Boolean(data.is_default),
       };
 
       if (isEditing && initialData) {
+        const originalPayload: UpdateAddressRequest = {
+          street: initialData.street,
+          number: initialData.number,
+          neighborhood: initialData.neighborhood,
+          complement: initialData.complement || null,
+          cep: onlyDigits(initialData.cep),
+          city_ibge_code: String(
+            initialData.city?.ibge_code || initialData.city_ibge_code
+          ),
+          is_default: Boolean(initialData.is_default),
+        };
+
+        const diff = calculateDiff(originalPayload, payload);
+
+        if (Object.keys(diff).length === 0) {
+          onOpenChange(false);
+          return;
+        }
+
         await updateMutation.mutateAsync({
           addressId: initialData.id,
-          data: payload,
+          data: diff,
         });
       } else {
         await createMutation.mutateAsync(payload);
@@ -138,7 +201,7 @@ export function AddressDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
-          {/* CEP e Cidade IBGE */}
+          {/* CEP e UF */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cep" className="text-sm font-medium">
@@ -159,17 +222,58 @@ export function AddressDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="city_ibge_code" className="text-sm font-medium">
-                Cód. IBGE Município <span className="text-destructive">*</span>
+              <Label htmlFor="uf_ibge_code" className="text-sm font-medium">
+                UF (Estado) <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="city_ibge_code"
-                placeholder="Ex.: 3550308 (SP)"
-                {...register("city_ibge_code")}
+              <Select
+                value={ufValue || undefined}
+                onValueChange={handleUfChange}
                 disabled={isSubmitting}
-              />
-              <FormFieldError error={errors.city_ibge_code} />
+              >
+                <SelectTrigger id="uf_ibge_code">
+                  <SelectValue placeholder="Selecione a UF" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UFS.map((uf) => (
+                    <SelectItem key={uf.ibge_code} value={String(uf.ibge_code)}>
+                      {uf.abbreviation} - {uf.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormFieldError error={errors.uf_ibge_code} />
             </div>
+          </div>
+
+          {/* Cidade / Município (envia o código IBGE por baixo dos panos) */}
+          <div className="space-y-2">
+            <Label htmlFor="city_ibge_code" className="text-sm font-medium">
+              Cidade / Município <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              key={ufValue || "no-uf"}
+              value={cityIbgeValue || undefined}
+              onValueChange={handleCityChange}
+              disabled={isSubmitting || !ufValue}
+            >
+              <SelectTrigger id="city_ibge_code">
+                <SelectValue
+                  placeholder={
+                    !ufValue
+                      ? "Selecione a UF primeiro"
+                      : "Selecione a cidade"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {citiesForSelectedUf.map((city) => (
+                  <SelectItem key={city.ibge_code} value={city.ibge_code}>
+                    {city.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormFieldError error={errors.city_ibge_code} />
           </div>
 
           {/* Rua e Número */}
@@ -229,6 +333,18 @@ export function AddressDialog({
               <FormFieldError error={errors.complement} />
             </div>
           </div>
+
+          {/* Endereço Padrão */}
+          <label className="flex items-center gap-2.5 pt-1 text-xs font-medium text-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={Boolean(isDefaultValue)}
+              onChange={(e) => setValue("is_default", e.target.checked)}
+              disabled={isSubmitting}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <span>Definir como endereço padrão</span>
+          </label>
 
           <DialogFooter className="pt-4 border-t border-border">
             <Button

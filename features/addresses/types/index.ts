@@ -1,3 +1,16 @@
+export interface UfResource {
+  ibge_code: string;
+  name: string;
+  abbreviation: string;
+}
+
+export interface CityResource {
+  ibge_code: string;
+  name: string;
+  uf_ibge_code: string;
+  uf?: UfResource;
+}
+
 export interface AddressResource {
   id: string;
   street: string;
@@ -6,6 +19,7 @@ export interface AddressResource {
   complement: string | null;
   cep: string;
   city_ibge_code: string | number;
+  city?: CityResource;
   is_default?: boolean;
 }
 

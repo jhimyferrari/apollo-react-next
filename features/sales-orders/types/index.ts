@@ -54,10 +54,24 @@ export interface UpdateSalesOrderRequest {
     to_add?: StoreSalesOrderItemInput[];
     to_update?: Array<{
       id: string;
-      product_id?: string;
       number?: number;
       quantity?: number;
     }>;
-    to_remove?: Array<{ id: string }>;
+    to_remove?: string[];
+  };
+}
+
+export interface OutdatedPriceWarning {
+  product_id: string;
+  product_name: string;
+  negotiated_price: string | number;
+  current_price: string | number;
+}
+
+export interface ReopenSalesOrderResponse {
+  message: string;
+  data?: {
+    order: SalesOrderResource;
+    outdated_prices?: OutdatedPriceWarning[];
   };
 }

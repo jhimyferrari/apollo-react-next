@@ -1,4 +1,5 @@
-import { getToken, removeToken } from "../auth/token";
+import { getToken } from "../auth/token";
+import { clearSession } from "../auth/session";
 import { parseApiError } from "./errors";
 import type { ParsedApiError } from "./types";
 
@@ -102,9 +103,9 @@ class HttpClient {
 
       // Se desautenticado (401), limpa credenciais e redireciona ao login
       if (parsed.isUnauthenticated) {
-        removeToken();
+        clearSession();
         if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
+          window.location.replace("/login");
         }
       }
 

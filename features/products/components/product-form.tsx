@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -96,7 +96,6 @@ export function ProductForm({ initialData }: ProductFormProps) {
     handleSubmit,
     control,
     setValue,
-    watch,
     setError,
     formState: { errors },
   } = useForm<ProductFormData>({
@@ -115,8 +114,11 @@ export function ProductForm({ initialData }: ProductFormProps) {
     },
   });
 
-  const ncmValue = watch("ncm");
-  const selectedCategories = watch("category_ids") || [];
+  const costPriceValue = useWatch({ control, name: "cost_price" });
+  const salePriceValue = useWatch({ control, name: "sale_price" });
+  const stockQuantityValue = useWatch({ control, name: "stock_quantity" });
+  const ncmValue = useWatch({ control, name: "ncm" });
+  const selectedCategories = useWatch({ control, name: "category_ids" }) || [];
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -162,14 +164,19 @@ export function ProductForm({ initialData }: ProductFormProps) {
 
       // REGRA: Telas de edição enviam apenas o que mudou (PATCH com diffs)
       const diff = calculateDiff(originalPayload, currentPayload);
+      delete (diff as Record<string, unknown>).stock_quantity;
 
-      // No OpenAPI, UpdateProductRequest tem [name, unit, cost_price, sale_price] como required
-      // Garantimos que os campos required do schema da rota continuem coerentes
+      if (Object.keys(diff).length === 0) {
+        router.push("/products");
+        return;
+      }
+
+      // No OpenAPI e UpdateProductRequest, [name, unit, cost_price, sale_price] são required
+      // e cost_price / sale_price aceitam até 2 casas decimais no PATCH
       diff.name = currentPayload.name;
       diff.unit = currentPayload.unit;
-      diff.cost_price = currentPayload.cost_price;
-      diff.sale_price = currentPayload.sale_price;
-      delete (diff as Record<string, unknown>).stock_quantity;
+      diff.cost_price = Number(currentPayload.cost_price.toFixed(2));
+      diff.sale_price = Number(currentPayload.sale_price.toFixed(2));
 
       try {
         await updateMutation.mutateAsync({ id: initialData.id, diff });
@@ -307,7 +314,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
               id="cost_price"
               type="text"
               placeholder="0,0000"
-              value={watch("cost_price") || ""}
+              value={costPriceValue || ""}
               onChange={(e) => {
                 const masked = maskPrice(e.target.value);
                 setValue("cost_price", masked, { shouldValidate: true });
@@ -329,7 +336,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
               id="sale_price"
               type="text"
               placeholder="0,0000"
-              value={watch("sale_price") || ""}
+              value={salePriceValue || ""}
               onChange={(e) => {
                 const masked = maskPrice(e.target.value);
                 setValue("sale_price", masked, { shouldValidate: true });
@@ -352,7 +359,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 id="stock_quantity"
                 type="text"
                 placeholder="0,000"
-                value={watch("stock_quantity") || ""}
+                value={stockQuantityValue || ""}
                 onChange={(e) => {
                   const masked = maskStock(e.target.value);
                   setValue("stock_quantity", masked, { shouldValidate: true });
@@ -471,6 +478,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
               })}
             </div>
           )}
+          <FormFieldError error={errors.category_ids} />
         </div>
       </div>
 

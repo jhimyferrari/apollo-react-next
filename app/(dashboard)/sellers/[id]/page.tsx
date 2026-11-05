@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/common/loading-skeleton";
 import { SellerForm } from "@/features/sellers/components/seller-form";
 import { useSeller } from "@/features/sellers/hooks/use-sellers";
+import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function EditSellerPage({
@@ -61,15 +62,21 @@ export default function EditSellerPage({
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Editar: ${seller.legal_name}`}
-        description={`Código #${seller.number} • ${seller.trade_name}`}
-      />
+    <PermissionGuard
+      permission="seller.update"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para editar os dados deste vendedor."
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title={`Editar: ${seller.legal_name}`}
+          description={`Código #${seller.number} • ${seller.trade_name}`}
+        />
 
-      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-        <SellerForm initialData={seller} />
+        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+          <SellerForm initialData={seller} />
+        </div>
       </div>
-    </div>
+    </PermissionGuard>
   );
 }

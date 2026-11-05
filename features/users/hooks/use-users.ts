@@ -47,6 +47,7 @@ export function useUpdateUser() {
       userService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["current-user-permissions"] });
       toast.success("Permissões do usuário atualizadas!");
     },
     onError: (err) => {

@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft, Save, Building2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ export function ClientForm({ initialData }: ClientFormProps) {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     setError,
     formState: { errors },
   } = useForm<ClientFormData>({
@@ -48,8 +48,8 @@ export function ClientForm({ initialData }: ClientFormProps) {
     },
   });
 
-  const documentValue = watch("document");
-  const phoneValue = watch("phone");
+  const documentValue = useWatch({ control, name: "document" });
+  const phoneValue = useWatch({ control, name: "phone" });
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -80,6 +80,10 @@ export function ClientForm({ initialData }: ClientFormProps) {
         const diff = calculateDiff(originalPayload, currentPayload);
 
         if (Object.keys(diff).length > 0) {
+          diff.document = currentPayload.document;
+          diff.legal_name = currentPayload.legal_name;
+          diff.trade_name = currentPayload.trade_name;
+
           await updateMutation.mutateAsync({
             id: initialData.id,
             data: diff,

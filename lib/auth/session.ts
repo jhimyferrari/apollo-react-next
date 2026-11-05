@@ -1,4 +1,4 @@
-import { removeToken } from "./token";
+import { removeToken, notifyAuthChange } from "./token";
 
 export interface SessionUser {
   id: string;
@@ -13,26 +13,46 @@ export interface SessionUser {
 
 const USER_KEY = "apollo_auth_user";
 
+let cachedRawUser: string | null = null;
+let cachedParsedUser: SessionUser | null = null;
+
 export function getUserSession(): SessionUser | null {
   if (typeof window === "undefined") {
     return null;
   }
   const raw = localStorage.getItem(USER_KEY);
-  if (!raw) return null;
+  if (!raw) {
+    cachedRawUser = null;
+    cachedParsedUser = null;
+    return null;
+  }
+  if (raw === cachedRawUser) {
+    return cachedParsedUser;
+  }
   try {
-    return JSON.parse(raw) as SessionUser;
+    cachedRawUser = raw;
+    cachedParsedUser = JSON.parse(raw) as SessionUser;
+    return cachedParsedUser;
   } catch {
+    cachedRawUser = null;
+    cachedParsedUser = null;
     return null;
   }
 }
 
 export function setUserSession(user: SessionUser): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  const serialized = JSON.stringify(user);
+  cachedRawUser = serialized;
+  cachedParsedUser = user;
+  localStorage.setItem(USER_KEY, serialized);
+  notifyAuthChange();
 }
 
 export function clearSession(): void {
   if (typeof window === "undefined") return;
-  removeToken();
+  cachedRawUser = null;
+  cachedParsedUser = null;
   localStorage.removeItem(USER_KEY);
+  removeToken();
 }
