@@ -2,43 +2,43 @@
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { reportService } from "../services/report.service";
-import { brandService } from "@/features/brands/services/brand.service";
-import { categoryService } from "@/features/categories/services/category.service";
-import { clientService } from "@/features/clients/services/client.service";
-import { productService } from "@/features/products/services/product.service";
-import { sellerService } from "@/features/sellers/services/seller.service";
-import { supplierService } from "@/features/suppliers/services/supplier.service";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import { maskDocument } from "@/lib/masks";
 import type { ReportFilters } from "../types";
 
-export function useSalesSummaryReport(filters: ReportFilters) {
+export function useSalesSummaryReport(filters: ReportFilters, enabled = true) {
   return useQuery({
     queryKey: ["reports", "sales", "summary", filters],
     queryFn: () => reportService.salesSummary(filters),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
-export function useSalesByProductReport(filters: ReportFilters) {
+export function useSalesByProductReport(filters: ReportFilters, enabled = true) {
   return useQuery({
     queryKey: ["reports", "sales", "by-product", filters],
     queryFn: () => reportService.salesByProduct(filters),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
-export function useSalesBySellerReport(filters: ReportFilters) {
+export function useSalesBySellerReport(filters: ReportFilters, enabled = true) {
   return useQuery({
     queryKey: ["reports", "sales", "by-seller", filters],
     queryFn: () => reportService.salesBySeller(filters),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
-export function usePurchasesSummaryReport(filters: ReportFilters) {
+export function usePurchasesSummaryReport(filters: ReportFilters, enabled = true) {
   return useQuery({
     queryKey: ["reports", "purchases", "summary", filters],
     queryFn: () => reportService.purchasesSummary(filters),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
@@ -55,46 +55,63 @@ export interface FilterOption {
   label: string;
 }
 
-const OPTIONS_PARAMS = { per_page: 100 };
 const STALE_TIME = 1000 * 60 * 5;
 
 /**
- * Carrega as opções (até 100 registros) dos seletores de filtro.
- * `enabled` evita requisições a endpoints sem permissão de leitura.
+ * Carrega as opções de filtro utilizando os novos endpoints dedicados `/v1/lookups/*`
+ * com `status: "all"`, permitindo filtrar inclusive por registros inativos no histórico
+ * e sem truncamento de paginação.
  */
 export function useFilterOptions(entity: FilterEntity, enabled: boolean) {
   return useQuery<FilterOption[]>({
-    queryKey: ["reports", "filter-options", entity],
+    queryKey: ["reports", "lookup-options", entity],
     enabled,
     staleTime: STALE_TIME,
     queryFn: async () => {
       switch (entity) {
         case "clients": {
-          const res = await clientService.list(OPTIONS_PARAMS);
-          return res.data.map((c) => ({ value: c.id, label: c.trade_name || c.legal_name }));
+          const res = await lookupService.clients({ status: "all" });
+          return (res.data || []).map((c) => ({
+            value: c.id,
+            label: `#${c.number} - ${c.name}${c.document ? ` (${maskDocument(c.document)})` : ""}`,
+          }));
         }
         case "sellers": {
-          const res = await sellerService.list(OPTIONS_PARAMS);
-          return res.data.map((s) => ({ value: s.id, label: s.trade_name || s.legal_name }));
+          const res = await lookupService.sellers({ status: "all" });
+          return (res.data || []).map((s) => ({
+            value: s.id,
+            label: `#${s.number} - ${s.name}`,
+          }));
         }
         case "suppliers": {
-          const res = await supplierService.list(OPTIONS_PARAMS);
-          return res.data.map((s) => ({ value: s.id, label: s.trade_name || s.legal_name }));
+          const res = await lookupService.suppliers({ status: "all" });
+          return (res.data || []).map((s) => ({
+            value: s.id,
+            label: `#${s.number} - ${s.name}${s.document ? ` (${maskDocument(s.document)})` : ""}`,
+          }));
         }
         case "products": {
-          const res = await productService.list(OPTIONS_PARAMS);
-          return res.data.map((p) => ({ value: p.id, label: p.name }));
+          const res = await lookupService.products({ status: "all" });
+          return (res.data || []).map((p) => ({
+            value: p.id,
+            label: `#${p.number} - ${p.name} (${p.unit.toUpperCase()})`,
+          }));
         }
         case "categories": {
-          const res = await categoryService.list(OPTIONS_PARAMS);
-          return res.data.map((c) => ({ value: c.id, label: c.name }));
+          const res = await lookupService.categories();
+          return (res.data || []).map((c) => ({
+            value: c.id,
+            label: `#${c.number} - ${c.name}`,
+          }));
         }
         case "brands": {
-          const res = await brandService.list(OPTIONS_PARAMS);
-          return res.data.map((b) => ({ value: b.id, label: b.name }));
+          const res = await lookupService.brands();
+          return (res.data || []).map((b) => ({
+            value: b.id,
+            label: `#${b.number} - ${b.name}`,
+          }));
         }
       }
     },
   });
 }
-

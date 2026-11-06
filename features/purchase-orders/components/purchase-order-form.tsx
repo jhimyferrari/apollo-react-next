@@ -24,17 +24,20 @@ import {
   type PurchaseOrderFormData,
 } from "../schemas/purchase-order.schema";
 import { useCreatePurchaseOrder } from "../hooks/use-purchase-orders";
-import { useSuppliers } from "@/features/suppliers/hooks/use-suppliers";
-import { useProducts } from "@/features/products/hooks/use-products";
-import { maskStock } from "@/lib/masks";
+import {
+  useSupplierLookup,
+  useProductLookup,
+} from "@/features/lookups/hooks/use-lookups";
+import { extractLookupAmount } from "@/features/lookups/types";
+import { maskDocument, maskStock } from "@/lib/masks";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 
 export function PurchaseOrderForm() {
   const router = useRouter();
   const createMutation = useCreatePurchaseOrder();
 
-  const { data: suppliersData, isLoading: isLoadingSuppliers } = useSuppliers(1);
-  const { data: productsData, isLoading: isLoadingProducts } = useProducts(1);
+  const { data: suppliersData, isLoading: isLoadingSuppliers } = useSupplierLookup();
+  const { data: productsData, isLoading: isLoadingProducts } = useProductLookup();
 
   const suppliers = suppliersData?.data || [];
   const products = productsData?.data || [];
@@ -75,11 +78,7 @@ export function PurchaseOrderForm() {
 
     const prod = products.find((p) => p.id === productId);
     if (prod) {
-      const priceStr =
-        typeof prod.cost_price === "object" && prod.cost_price !== null
-          ? String((prod.cost_price as Record<string, unknown>).amount || "0")
-          : String(prod.cost_price || "0");
-
+      const priceStr = extractLookupAmount(prod.cost_price, "0");
       setValue(`items.${index}.unit_price`, priceStr);
     }
   };
@@ -130,7 +129,8 @@ export function PurchaseOrderForm() {
             <SelectContent>
               {suppliers.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.legal_name} ({s.trade_name})
+                  #{s.number} - {s.name}
+                  {s.document ? ` (${maskDocument(s.document)})` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -197,7 +197,7 @@ export function PurchaseOrderForm() {
                       <SelectContent>
                         {products.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.unit})
+                            #{p.number} - {p.name} ({p.unit.toUpperCase()})
                           </SelectItem>
                         ))}
                       </SelectContent>

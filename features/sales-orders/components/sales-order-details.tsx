@@ -34,9 +34,12 @@ import {
   useCancelSalesOrder,
   useDeleteSalesOrder,
 } from "../hooks/use-sales-orders";
-import { useClients } from "@/features/clients/hooks/use-clients";
-import { useSellers } from "@/features/sellers/hooks/use-sellers";
-import { useProducts } from "@/features/products/hooks/use-products";
+import {
+  useClientLookup,
+  useSellerLookup,
+  useProductLookup,
+} from "@/features/lookups/hooks/use-lookups";
+import { extractLookupAmount } from "@/features/lookups/types";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import type {
   SalesOrderResource,
@@ -98,9 +101,9 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
   const cancelMutation = useCancelSalesOrder();
   const deleteMutation = useDeleteSalesOrder();
 
-  const { data: clientsData } = useClients(1);
-  const { data: sellersData } = useSellers(1);
-  const { data: productsData } = useProducts(1);
+  const { data: clientsData } = useClientLookup(undefined, isEditingDraft);
+  const { data: sellersData } = useSellerLookup(undefined, isEditingDraft);
+  const { data: productsData } = useProductLookup(undefined, isEditingDraft);
 
   const clients = clientsData?.data || [];
   const sellers = sellersData?.data || [];
@@ -134,11 +137,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
 
   const handleEditProductChange = (index: number, productId: string) => {
     const prod = products.find((p) => p.id === productId);
-    const priceStr = prod
-      ? typeof prod.sale_price === "object" && prod.sale_price !== null
-        ? String((prod.sale_price as Record<string, unknown>).amount || "0")
-        : String(prod.sale_price || "0")
-      : "0";
+    const priceStr = prod ? extractLookupAmount(prod.sale_price, "0") : "0";
 
     setEditItems((prev) =>
       prev.map((item, idx) =>
@@ -430,7 +429,8 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                   <SelectContent>
                     {clients.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.legal_name} ({c.trade_name})
+                        #{c.number} - {c.name}
+                        {c.document ? ` (${maskDocument(c.document)})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -450,7 +450,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                   <SelectContent>
                     {sellers.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.trade_name} ({s.legal_name})
+                        #{s.number} - {s.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -519,7 +519,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                         <SelectContent>
                           {products.map((p) => (
                             <SelectItem key={p.id} value={p.id}>
-                              {p.name} ({p.unit})
+                              #{p.number} - {p.name} ({p.unit.toUpperCase()})
                             </SelectItem>
                           ))}
                         </SelectContent>

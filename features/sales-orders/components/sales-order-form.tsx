@@ -21,19 +21,22 @@ import { FormFieldError } from "@/components/common/form-field-error";
 import { MoneyDisplay } from "@/components/common/money-display";
 import { salesOrderSchema, type SalesOrderFormData } from "../schemas/sales-order.schema";
 import { useCreateSalesOrder } from "../hooks/use-sales-orders";
-import { useClients } from "@/features/clients/hooks/use-clients";
-import { useSellers } from "@/features/sellers/hooks/use-sellers";
-import { useProducts } from "@/features/products/hooks/use-products";
-import { maskStock } from "@/lib/masks";
+import {
+  useClientLookup,
+  useSellerLookup,
+  useProductLookup,
+} from "@/features/lookups/hooks/use-lookups";
+import { extractLookupAmount } from "@/features/lookups/types";
+import { maskDocument, maskStock } from "@/lib/masks";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 
 export function SalesOrderForm() {
   const router = useRouter();
   const createMutation = useCreateSalesOrder();
 
-  const { data: clientsData, isLoading: isLoadingClients } = useClients(1);
-  const { data: sellersData, isLoading: isLoadingSellers } = useSellers(1);
-  const { data: productsData, isLoading: isLoadingProducts } = useProducts(1);
+  const { data: clientsData, isLoading: isLoadingClients } = useClientLookup();
+  const { data: sellersData, isLoading: isLoadingSellers } = useSellerLookup();
+  const { data: productsData, isLoading: isLoadingProducts } = useProductLookup();
 
   const clients = clientsData?.data || [];
   const sellers = sellersData?.data || [];
@@ -77,11 +80,7 @@ export function SalesOrderForm() {
 
     const prod = products.find((p) => p.id === productId);
     if (prod) {
-      const priceStr =
-        typeof prod.sale_price === "object" && prod.sale_price !== null
-          ? String((prod.sale_price as Record<string, unknown>).amount || "0")
-          : String(prod.sale_price || "0");
-
+      const priceStr = extractLookupAmount(prod.sale_price, "0");
       setValue(`items.${index}.unit_price`, priceStr);
     }
   };
@@ -134,7 +133,8 @@ export function SalesOrderForm() {
             <SelectContent>
               {clients.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
-                  {c.legal_name} ({c.trade_name})
+                  #{c.number} - {c.name}
+                  {c.document ? ` (${maskDocument(c.document)})` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -160,7 +160,7 @@ export function SalesOrderForm() {
             <SelectContent>
               {sellers.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.trade_name} ({s.legal_name})
+                  #{s.number} - {s.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -227,7 +227,7 @@ export function SalesOrderForm() {
                       <SelectContent>
                         {products.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.unit})
+                            #{p.number} - {p.name} ({p.unit.toUpperCase()})
                           </SelectItem>
                         ))}
                       </SelectContent>

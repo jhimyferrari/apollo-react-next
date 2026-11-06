@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
 import { supplierService } from "@/features/suppliers/services/supplier.service";
+import { lookupService } from "@/features/lookups/services/lookup.service";
 import type {
   PurchaseOrderResource,
   StorePurchaseOrderRequest,
@@ -52,7 +53,27 @@ export const purchaseOrderService = {
           enriched.supplier = supplierRes.data;
         }
       } catch {
-        // Fallback silencioso
+        try {
+          const lookupRes = await lookupService.suppliers({ status: "all" });
+          const found = lookupRes?.data?.find((s) => s.id === enriched.supplier_id);
+          if (found) {
+            enriched.supplier = {
+              id: found.id,
+              number: found.number,
+              status: found.status,
+              document: found.document,
+              legal_name: found.name,
+              trade_name: found.name,
+              state_registration: null,
+              phone: null,
+              email: null,
+              created_at: null,
+              updated_at: null,
+            };
+          }
+        } catch {
+          // Fallback silencioso
+        }
       }
     }
 

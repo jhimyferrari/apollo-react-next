@@ -1,6 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import {
+  DollarSign,
+  Eye,
+  Layers,
+  ShoppingBag,
+  ShoppingCart,
+  TrendingUp,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/common/data-table-pagination";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { formatDate, formatQuantity } from "@/lib/formatters";
 import {
   useSalesSummaryReport,
@@ -23,6 +34,7 @@ import {
   PaymentBadge,
   ReportEmpty,
   ReportError,
+  ReportNav,
   ReportStatsSkeleton,
   STATUS_LABELS,
   StatCard,
@@ -44,13 +56,13 @@ interface SummaryViewProps {
   isError: boolean;
   errorMessage?: string;
   refetch: () => void;
+  onResetFilters: () => void;
   totals?: OrderSummaryTotals;
   rows: (SalesSummaryRow | PurchaseSummaryRow)[];
   meta?: ReportPaginationMeta;
   onPageChange: (page: number) => void;
 }
 
-/** Converte o meta enxuto dos relatórios para o formato esperado pela paginação padrão. */
 function toPaginationMeta(meta: ReportPaginationMeta): PaginationMeta {
   return { ...meta, links: [], path: null };
 }
@@ -62,14 +74,30 @@ function SummaryView({
   isError,
   errorMessage,
   refetch,
+  onResetFilters,
   totals,
   rows,
   meta,
   onPageChange,
 }: SummaryViewProps) {
+  const { can } = usePermissions();
+  const canViewClient = can("client.view");
+  const canViewSeller = can("seller.view");
+  const canViewSupplier = can("supplier.view");
+
   if (isError) return <ReportError message={errorMessage} onRetry={refetch} />;
 
-  const partnerLabel = kind === "sales" ? "Cliente" : "Fornecedor";
+  const isSales = kind === "sales";
+  const partnerLabel = isSales ? "Cliente" : "Fornecedor";
+  const orderBasePath = isSales ? "/sales-orders" : "/purchase-orders";
+
+  const avgItemsPerOrder =
+    totals && totals.orders_count > 0
+      ? (Number(totals.total_items_quantity) / totals.orders_count).toLocaleString(
+          "pt-BR",
+          { maximumFractionDigits: 2 }
+        )
+      : "0";
 
   return (
     <div className="space-y-6">
@@ -79,84 +107,165 @@ function SummaryView({
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title={kind === "sales" ? "Total vendido" : "Total comprado"}
+              title={isSales ? "Faturamento no Período" : "Volume Comprado no Período"}
               value={totals.total_amount_formatted}
+              hint={`Baseado em ${totals.orders_count} ${
+                totals.orders_count === 1 ? "pedido filtrado" : "pedidos filtrados"
+              }`}
+              icon={DollarSign}
+              accent="emerald"
             />
-            <StatCard title="Pedidos" value={totals.orders_count} />
-            <StatCard title="Ticket médio" value={totals.average_ticket_formatted} />
             <StatCard
-              title="Itens (quantidade total)"
+              title="Total de Pedidos"
+              value={totals.orders_count}
+              hint={
+                isSales
+                  ? "Ordens de venda contabilizadas"
+                  : "Ordens de compra contabilizadas"
+              }
+              icon={isSales ? ShoppingCart : ShoppingBag}
+              accent="primary"
+            />
+            <StatCard
+              title="Ticket Médio por Pedido"
+              value={totals.average_ticket_formatted}
+              hint="Valor médio por operação"
+              icon={TrendingUp}
+              accent="sky"
+            />
+            <StatCard
+              title="Volume Total de Itens"
               value={formatQuantity(totals.total_items_quantity)}
+              hint={`Média de ${avgItemsPerOrder} un./itens por pedido`}
+              icon={Layers}
+              accent="amber"
             />
           </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <BreakdownCard
-              title="Distribuição por status"
+              title="Distribuição por Status do Pedido"
+              subtitle="Panorama geral no período e parceiro selecionados"
               entries={totals.by_status}
               labels={STATUS_LABELS}
+              expectedKeys={["confirmed", "draf", "cancelled"]}
             />
             <BreakdownCard
-              title="Distribuição por pagamento"
+              title="Distribuição por Status de Pagamento"
+              subtitle="Proporção financeira entre pedidos pagos e pendentes"
               entries={totals.by_payment_status}
               labels={PAYMENT_LABELS}
+              expectedKeys={["paid", "pending"]}
             />
           </div>
         </>
       )}
 
       {isLoading ? (
-        <TableSkeleton rows={6} cols={7} />
+        <TableSkeleton rows={6} cols={isSales ? 9 : 8} />
       ) : rows.length === 0 ? (
-        <ReportEmpty />
+        <ReportEmpty onReset={onResetFilters} />
       ) : (
-        <div className={isFetching ? "opacity-70 transition-opacity" : "transition-opacity"}>
-          <div className="rounded-md border border-border bg-card overflow-hidden">
+        <div
+          className={
+            isFetching ? "opacity-70 transition-opacity" : "transition-opacity"
+          }
+        >
+          <div className="rounded-md border border-border bg-card overflow-hidden shadow-xs">
+            <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Listagem Detalhada de {isSales ? "Pedidos de Venda" : "Pedidos de Compra"}
+              </span>
+              {meta && (
+                <span className="text-xs text-muted-foreground">
+                  Total de <strong>{meta.total}</strong>{" "}
+                  {meta.total === 1 ? "registro" : "registros"}
+                </span>
+              )}
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">#</TableHead>
+                  <TableHead className="w-20">Pedido</TableHead>
                   <TableHead>{partnerLabel}</TableHead>
-                  {kind === "sales" && <TableHead>Vendedor</TableHead>}
+                  {isSales && <TableHead>Vendedor</TableHead>}
                   <TableHead className="w-20 text-right">Itens</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Valor Total</TableHead>
                   <TableHead className="w-28 text-center">Status</TableHead>
                   <TableHead className="w-28 text-center">Pagamento</TableHead>
                   <TableHead className="w-28">Confirmação</TableHead>
-                  <TableHead className="w-28">Criação</TableHead>
+                  <TableHead className="w-28">Emissão</TableHead>
+                  <TableHead className="w-16 text-center">Ver</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
-                  const partner =
-                    kind === "sales"
-                      ? (row as SalesSummaryRow).client
-                      : (row as PurchaseSummaryRow).supplier;
-                  const seller = kind === "sales" ? (row as SalesSummaryRow).seller : null;
+                  const partner = isSales
+                    ? (row as SalesSummaryRow).client
+                    : (row as PurchaseSummaryRow).supplier;
+                  const seller = isSales ? (row as SalesSummaryRow).seller : null;
+                  const canLinkPartner = isSales ? canViewClient : canViewSupplier;
+                  const partnerBasePath = isSales ? "/clients" : "/suppliers";
 
                   return (
                     <TableRow key={row.id}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        #{row.number}
+                      <TableCell className="font-mono text-xs">
+                        <Link
+                          href={`${orderBasePath}/${row.id}`}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          #{row.number}
+                        </Link>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-foreground">
-                            {partner?.legal_name || "-"}
-                          </span>
-                          {partner?.trade_name && (
-                            <span className="text-xs text-muted-foreground">
-                              {partner.trade_name}
-                            </span>
-                          )}
-                        </div>
+                        {partner ? (
+                          <div className="flex flex-col">
+                            {canLinkPartner ? (
+                              <Link
+                                href={`${partnerBasePath}/${partner.id}`}
+                                className="font-medium text-foreground hover:text-primary hover:underline"
+                              >
+                                {partner.trade_name || partner.legal_name}
+                              </Link>
+                            ) : (
+                              <span className="font-medium text-foreground">
+                                {partner.trade_name || partner.legal_name}
+                              </span>
+                            )}
+                            {partner.trade_name &&
+                              partner.legal_name &&
+                              partner.trade_name !== partner.legal_name && (
+                                <span className="text-xs text-muted-foreground">
+                                  {partner.legal_name}
+                                </span>
+                              )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
-                      {kind === "sales" && (
+                      {isSales && (
                         <TableCell className="text-sm text-muted-foreground">
-                          {seller?.trade_name || seller?.legal_name || "-"}
+                          {seller ? (
+                            canViewSeller ? (
+                              <Link
+                                href={`/sellers/${seller.id}`}
+                                className="hover:text-primary hover:underline"
+                              >
+                                {seller.trade_name || seller.legal_name}
+                              </Link>
+                            ) : (
+                              seller.trade_name || seller.legal_name
+                            )
+                          ) : (
+                            "-"
+                          )}
                         </TableCell>
                       )}
-                      <TableCell className="text-right tabular-nums">{row.items_count}</TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {row.items_count}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums text-foreground">
                         {row.total_formatted}
                       </TableCell>
                       <TableCell className="text-center">
@@ -170,6 +279,19 @@ function SummaryView({
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatDate(row.created_at)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Visualizar pedido"
+                        >
+                          <Link href={`${orderBasePath}/${row.id}`}>
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          </Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -198,10 +320,20 @@ export function SalesSummaryReportView() {
 
   return (
     <div className="space-y-6">
+      <ReportNav />
       <ReportFilterBar
-        fields={["period", "date_field", "status", "payment_status", "client", "seller"]}
+        fields={[
+          "period",
+          "date_field",
+          "status",
+          "payment_status",
+          "client",
+          "seller",
+        ]}
         value={filters}
         onApply={setFilters}
+        onRefresh={() => q.refetch()}
+        isFetching={q.isFetching}
       />
       <SummaryView
         kind="sales"
@@ -210,6 +342,7 @@ export function SalesSummaryReportView() {
         isError={q.isError}
         errorMessage={q.error?.message}
         refetch={() => q.refetch()}
+        onResetFilters={() => setFilters(DEFAULT_FILTERS)}
         totals={q.data?.totals}
         rows={q.data?.data ?? []}
         meta={q.data?.meta}
@@ -225,10 +358,19 @@ export function PurchasesSummaryReportView() {
 
   return (
     <div className="space-y-6">
+      <ReportNav />
       <ReportFilterBar
-        fields={["period", "date_field", "status", "payment_status", "supplier"]}
+        fields={[
+          "period",
+          "date_field",
+          "status",
+          "payment_status",
+          "supplier",
+        ]}
         value={filters}
         onApply={setFilters}
+        onRefresh={() => q.refetch()}
+        isFetching={q.isFetching}
       />
       <SummaryView
         kind="purchases"
@@ -237,6 +379,7 @@ export function PurchasesSummaryReportView() {
         isError={q.isError}
         errorMessage={q.error?.message}
         refetch={() => q.refetch()}
+        onResetFilters={() => setFilters(DEFAULT_FILTERS)}
         totals={q.data?.totals}
         rows={q.data?.data ?? []}
         meta={q.data?.meta}
@@ -245,4 +388,3 @@ export function PurchasesSummaryReportView() {
     </div>
   );
 }
-

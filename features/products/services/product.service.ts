@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import type { LookupParams } from "@/features/lookups/types";
 import type {
   ProductResource,
   StoreProductRequest,
@@ -12,6 +14,10 @@ export const productService = {
       "/v1/products",
       params
     );
+  },
+
+  lookup(params?: LookupParams) {
+    return lookupService.products(params);
   },
 
   async getById(id: string): Promise<{ data: ProductResource }> {
