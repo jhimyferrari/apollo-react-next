@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
 import { clientService } from "@/features/clients/services/client.service";
 import { sellerService } from "@/features/sellers/services/seller.service";
+import { lookupService } from "@/features/lookups/services/lookup.service";
 import type {
   SalesOrderResource,
   StoreSalesOrderRequest,
@@ -59,7 +60,27 @@ export const salesOrderService = {
           enriched.client = clientRes.data;
         }
       } catch {
-        // Fallback silencioso
+        try {
+          const lookupRes = await lookupService.clients({ status: "all" });
+          const found = lookupRes?.data?.find((c) => c.id === enriched.client_id);
+          if (found) {
+            enriched.client = {
+              id: found.id,
+              number: found.number,
+              status: found.status,
+              document: found.document,
+              legal_name: found.name,
+              trade_name: found.name,
+              state_registration: null,
+              phone: null,
+              email: null,
+              created_at: null,
+              updated_at: null,
+            };
+          }
+        } catch {
+          // Fallback silencioso
+        }
       }
     }
 
@@ -70,7 +91,29 @@ export const salesOrderService = {
           enriched.seller = sellerRes.data;
         }
       } catch {
-        // Fallback silencioso
+        try {
+          const lookupRes = await lookupService.sellers({ status: "all" });
+          const found = lookupRes?.data?.find((s) => s.id === enriched.seller_id);
+          if (found) {
+            enriched.seller = {
+              id: found.id,
+              number: found.number,
+              status: found.status,
+              document: "",
+              legal_name: found.name,
+              trade_name: found.name,
+              state_registration: null,
+              phone: null,
+              email: null,
+              started_at: null,
+              ended_at: null,
+              created_at: null,
+              updated_at: null,
+            };
+          }
+        } catch {
+          // Fallback silencioso
+        }
       }
     }
 

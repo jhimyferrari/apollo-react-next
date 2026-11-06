@@ -271,27 +271,48 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 
 ---
 
-## 10. Relatórios (`reports`)
+## 10. Endpoints de Lookup para Seletores (`lookups`)
+
+Localização: [`features/lookups/`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/lookups)
+
+Para preencher componentes `<Select>` sem truncamento de paginação e sem exigir que o operador possua permissão de leitura completa sobre o módulo relacionado (ex.: permitir que um vendedor com `sales-order.create` selecione clientes e produtos sem possuir `client.view` ou `product.view`), o frontend consome os endpoints leves `/v1/lookups/*`:
+
+| Endpoint | Hook | Serviço | Permissões Aceitas (Qualquer uma) |
+| :--- | :--- | :--- | :--- |
+| `GET /v1/lookups/clients` | `useClientLookup` | `lookupService.clients` / `clientService.lookup` | `client.view`, `sales-order.view`, `sales-order.create`, `sales-order.update` |
+| `GET /v1/lookups/sellers` | `useSellerLookup` | `lookupService.sellers` / `sellerService.lookup` | `seller.view`, `sales-order.view`, `sales-order.create`, `sales-order.update` |
+| `GET /v1/lookups/products` | `useProductLookup` | `lookupService.products` / `productService.lookup` | `product.view`, `sales-order.*`, `purchase-order.*` |
+| `GET /v1/lookups/suppliers` | `useSupplierLookup` | `lookupService.suppliers` / `supplierService.lookup` | `supplier.view`, `purchase-order.view`, `purchase-order.create`, `purchase-order.update` |
+| `GET /v1/lookups/brands` | `useBrandLookup` | `lookupService.brands` / `brandService.lookup` | `brand.view`, `product.create`, `product.update` |
+| `GET /v1/lookups/categories` | `useCategoryLookup` | `lookupService.categories` / `categoryService.lookup` | `category.view`, `product.create`, `product.update` |
+
+* **Parâmetros suportados (`LookupParams`)**: `status` (`"active"` por padrão na emissão de pedidos, ou `"all"` nos filtros de relatórios para incluir registros inativos do histórico) e `search` (busca textual).
+* **Invalidação Automática**: Qualquer criação, edição ou exclusão em `clients`, `sellers`, `suppliers`, `products`, `brands` ou `categories` invalida automaticamente a chave `["lookups", "<entidade>"]` no React Query.
+
+---
+
+## 11. Relatórios Gerenciais (`reports`)
 
 Localização: [`features/reports/`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/reports) · Rotas em `app/(dashboard)/reports/`.
 
 | Relatório | Rota | Endpoint | Permissão |
 | :--- | :--- | :--- | :--- |
-| Índice de relatórios | `/reports` | — | Qualquer permissão de relatório |
-| Vendas (resumo) | `/reports/sales/summary` | `GET /v1/reports/sales/summary` | `sales-order.view` |
-| Vendas por produto | `/reports/sales/by-product` | `GET /v1/reports/sales/by-product` | `sales-order.view` |
-| Vendas por vendedor | `/reports/sales/by-seller` | `GET /v1/reports/sales/by-seller` | `sales-order.view` |
-| Compras (resumo) | `/reports/purchases/summary` | `GET /v1/reports/purchases/summary` | `purchase-order.view` |
+| Central de Relatórios | `/reports` | — | `sales-order.view` ou `purchase-order.view` |
+| Resumo de Vendas | `/reports/sales/summary` | `GET /v1/reports/sales/summary` | `sales-order.view` |
+| Vendas por Produto | `/reports/sales/by-product` | `GET /v1/reports/sales/by-product` | `sales-order.view` |
+| Vendas por Vendedor | `/reports/sales/by-seller` | `GET /v1/reports/sales/by-seller` | `sales-order.view` |
+| Resumo de Compras | `/reports/purchases/summary` | `GET /v1/reports/purchases/summary` | `purchase-order.view` |
 
-* **Filtros** ([`ReportFilterBar`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/reports/components/report-filter-bar.tsx)): período (`start_date`/`end_date`, data final ≥ inicial), `date_field` (`confirmed_at`/`created_at`), `status`, `payment_status`, cliente, vendedor, fornecedor, produto, categoria e marca, além de ordenação (`order_by`/`order_direction`) nos relatórios agrupados. Os filtros são aplicados somente ao clicar em **Aplicar filtros**.
-* **Seletores de entidade**: carregam até 100 registros (`per_page=100`) e só aparecem se o usuário tiver a permissão `*.view` da entidade, evitando `403`.
-* **Status padrão**: sem `status`, a API considera apenas pedidos **confirmados**. A distribuição por status/pagamento nos resumos ignora o filtro de status.
-* **Valores monetários**: os campos `*_formatted` calculados pelo backend são exibidos diretamente, sem conversão para `float` no cliente.
-* **Paginação**: o `meta` enxuto dos relatórios é adaptado para o [`DataTablePagination`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/common/data-table-pagination.tsx) padrão (15 itens por página).
+* **Navegação Rápida (`ReportNav`)**: Barra de abas presente em todas as telas de relatório para alternância imediata entre os relatórios disponíveis para o perfil do usuário.
+* **Filtros e Atalhos de Período** ([`ReportFilterBar`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/reports/components/report-filter-bar.tsx)):
+  * **Atalhos rápidos de data**: *Hoje*, *Últimos 7 dias*, *Últimos 30 dias*, *Este mês*, *Mês passado*, *Este ano* e *Todo o período*.
+  * **Parâmetros**: período (`start_date`/`end_date`), `date_field` (`confirmed_at`/`created_at`), `status`, `payment_status`, cliente, vendedor, fornecedor, produto, categoria, marca, ordenação (`order_by`/`order_direction`) e quantidade por página (`per_page`: 15, 30, 50 ou 100).
+* **Seletores de Entidade via Lookups**: Utilizam `/v1/lookups/*` com `status=all`, exibindo código sequencial (`#number`), nome e documento formatado, respeitando as permissões compostas do `LookupController`.
+* **Ordenação Interativa e Curva de Participação**: Nos relatórios agrupados (*Vendas por Produto* e *Vendas por Vendedor*), os cabeçalhos das colunas numéricas permitem alternar a ordenação com um clique, exibindo posição no ranking (`1º`, `2º`, `3º`...) e barra visual de participação percentual no faturamento.
 
 ---
 
-## 11. Tabela de Referência Rápida: Máscaras e Formatadores
+## 12. Tabela de Referência Rápida: Máscaras e Formatadores
 
 | Finalidade | Função | Arquivo | Exemplo de Entrada | Resultado Formatado |
 | :--- | :--- | :--- | :--- | :--- |

@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import type { LookupParams } from "@/features/lookups/types";
 import { cleanDocument, onlyDigits } from "@/lib/masks";
 import type {
   SupplierResource,
@@ -10,6 +12,10 @@ import type {
 export const supplierService = {
   list(params?: { page?: number; per_page?: number }) {
     return apiClient.get<PaginatedResponse<SupplierResource>>("/v1/suppliers", params);
+  },
+
+  lookup(params?: LookupParams) {
+    return lookupService.suppliers(params);
   },
 
   getById(id: string) {

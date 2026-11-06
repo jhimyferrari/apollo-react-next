@@ -34,8 +34,11 @@ import {
   useCancelPurchaseOrder,
   useDeletePurchaseOrder,
 } from "../hooks/use-purchase-orders";
-import { useSuppliers } from "@/features/suppliers/hooks/use-suppliers";
-import { useProducts } from "@/features/products/hooks/use-products";
+import {
+  useSupplierLookup,
+  useProductLookup,
+} from "@/features/lookups/hooks/use-lookups";
+import { extractLookupAmount } from "@/features/lookups/types";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import type {
   PurchaseOrderResource,
@@ -96,8 +99,8 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
   const cancelMutation = useCancelPurchaseOrder();
   const deleteMutation = useDeletePurchaseOrder();
 
-  const { data: suppliersData } = useSuppliers(1);
-  const { data: productsData } = useProducts(1);
+  const { data: suppliersData } = useSupplierLookup(undefined, isEditingDraft);
+  const { data: productsData } = useProductLookup(undefined, isEditingDraft);
 
   const suppliers = suppliersData?.data || [];
   const products = productsData?.data || [];
@@ -129,11 +132,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
 
   const handleEditProductChange = (index: number, productId: string) => {
     const prod = products.find((p) => p.id === productId);
-    const priceStr = prod
-      ? typeof prod.cost_price === "object" && prod.cost_price !== null
-        ? String((prod.cost_price as Record<string, unknown>).amount || "0")
-        : String(prod.cost_price || "0")
-      : "0";
+    const priceStr = prod ? extractLookupAmount(prod.cost_price, "0") : "0";
 
     setEditItems((prev) =>
       prev.map((item, idx) =>
@@ -422,7 +421,8 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
                   <SelectContent>
                     {suppliers.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.legal_name} ({s.trade_name})
+                        #{s.number} - {s.name}
+                        {s.document ? ` (${maskDocument(s.document)})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -491,7 +491,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
                         <SelectContent>
                           {products.map((p) => (
                             <SelectItem key={p.id} value={p.id}>
-                              {p.name} ({p.unit})
+                              #{p.number} - {p.name} ({p.unit.toUpperCase()})
                             </SelectItem>
                           ))}
                         </SelectContent>

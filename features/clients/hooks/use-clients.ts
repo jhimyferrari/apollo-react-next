@@ -4,7 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { clientService } from "../services/client.service";
 import { parseApiError } from "@/lib/api/errors";
+import { useClientLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreClientRequest, UpdateClientRequest } from "../types";
+
+export { useClientLookup };
 
 export function useClients(page = 1) {
   return useQuery({
@@ -28,6 +31,7 @@ export function useCreateClient() {
     mutationFn: (data: StoreClientRequest) => clientService.create(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "clients"] });
       toast.success(res?.message || "Cliente cadastrado com sucesso!");
     },
     onError: (err) => {
@@ -52,6 +56,7 @@ export function useUpdateClient() {
     }) => clientService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "clients"] });
       toast.success("Cliente atualizado com sucesso!");
     },
     onError: (err) => {
@@ -70,6 +75,7 @@ export function useDeleteClient() {
     mutationFn: (id: string) => clientService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "clients"] });
       toast.success("Cliente excluído com sucesso!");
     },
     onError: (err) => {

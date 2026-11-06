@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   ShoppingBag,
   ShieldCheck,
+  BarChart3,
   LineChart,
   UserCheck,
   PackageSearch,
@@ -26,7 +27,7 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
-  permission?: string;
+  permission?: string | string[];
 }
 
 interface NavGroup {
@@ -112,6 +113,12 @@ const navigationItems: NavGroup[] = [
     title: "Relatórios",
     items: [
       {
+        name: "Central de Relatórios",
+        href: "/reports",
+        icon: BarChart3,
+        permission: ["sales-order.view", "purchase-order.view"],
+      },
+      {
         name: "Vendas",
         href: "/reports/sales/summary",
         icon: LineChart,
@@ -194,8 +201,8 @@ export function Sidebar({ className }: { className?: string }) {
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const isActive =
-                  item.href === "/"
-                    ? pathname === "/"
+                  item.href === "/" || item.href === "/reports"
+                    ? pathname === item.href
                     : pathname.startsWith(item.href);
 
                 const Icon = item.icon;

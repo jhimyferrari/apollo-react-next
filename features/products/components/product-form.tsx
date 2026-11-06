@@ -26,8 +26,7 @@ import {
   useCreateProduct,
   useUpdateProduct,
 } from "../hooks/use-products";
-import { useBrands } from "@/features/brands/hooks/use-brands";
-import { useCategories } from "@/features/categories/hooks/use-categories";
+import { useBrandLookup, useCategoryLookup } from "@/features/lookups/hooks/use-lookups";
 import { maskNCM, onlyDigits, maskPrice, maskStock } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { applyApiValidationErrors, parseApiError } from "@/lib/api/errors";
@@ -49,9 +48,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const createMutation = useCreateProduct();
   const updateMutation = useUpdateProduct();
 
-  // Busca lista de marcas e categorias para os seletores
-  const { data: brandsData } = useBrands(1);
-  const { data: categoriesData } = useCategories(1);
+  // Busca lista de marcas e categorias via endpoints de lookup (/v1/lookups/*)
+  const { data: brandsData, isLoading: isLoadingBrands } = useBrandLookup();
+  const { data: categoriesData } = useCategoryLookup();
 
   const brands = brandsData?.data || [];
   const categories = categoriesData?.data || [];
@@ -431,7 +430,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
               <Select
                 value={field.value || "none"}
                 onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
-                disabled={isSubmitting}
+                disabled={isLoadingBrands || isSubmitting}
               >
                 <SelectTrigger id="brand_id">
                   <SelectValue placeholder="Selecione uma marca..." />
@@ -440,7 +439,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
                   <SelectItem value="none">Nenhuma marca vinculada</SelectItem>
                   {brands.map((b) => (
                     <SelectItem key={b.id} value={b.id}>
-                      {b.name}
+                      #{b.number} - {b.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

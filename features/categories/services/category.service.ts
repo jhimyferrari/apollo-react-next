@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import type { LookupParams } from "@/features/lookups/types";
 import type {
   CategoryResource,
   StoreCategoryRequest,
@@ -12,6 +14,10 @@ export const categoryService = {
       "/v1/categories",
       params
     );
+  },
+
+  lookup(params?: LookupParams) {
+    return lookupService.categories(params);
   },
 
   getById(id: string) {

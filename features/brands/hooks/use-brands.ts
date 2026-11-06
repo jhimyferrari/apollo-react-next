@@ -4,7 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { brandService } from "../services/brand.service";
 import { parseApiError } from "@/lib/api/errors";
+import { useBrandLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreBrandRequest, UpdateBrandRequest } from "../types";
+
+export { useBrandLookup };
 
 export function useBrands(page = 1) {
   return useQuery({
@@ -28,6 +31,7 @@ export function useCreateBrand() {
     mutationFn: (data: StoreBrandRequest) => brandService.create(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "brands"] });
       toast.success(res?.message || "Marca criada com sucesso!");
     },
     onError: (err) => {
@@ -47,6 +51,7 @@ export function useUpdateBrand() {
       brandService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "brands"] });
       toast.success("Marca atualizada com sucesso!");
     },
     onError: (err) => {
@@ -65,6 +70,7 @@ export function useDeleteBrand() {
     mutationFn: (id: string) => brandService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "brands"] });
       toast.success("Marca excluída com sucesso!");
     },
     onError: (err) => {

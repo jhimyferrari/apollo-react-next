@@ -4,7 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { sellerService } from "../services/seller.service";
 import { parseApiError } from "@/lib/api/errors";
+import { useSellerLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreSellerRequest, UpdateSellerRequest } from "../types";
+
+export { useSellerLookup };
 
 export function useSellers(page = 1) {
   return useQuery({
@@ -28,6 +31,7 @@ export function useCreateSeller() {
     mutationFn: (data: StoreSellerRequest) => sellerService.create(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sellers"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "sellers"] });
       toast.success(res?.message || "Vendedor cadastrado com sucesso!");
     },
     onError: (err) => {
@@ -52,6 +56,7 @@ export function useUpdateSeller() {
     }) => sellerService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sellers"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "sellers"] });
       toast.success("Vendedor atualizado com sucesso!");
     },
     onError: (err) => {
@@ -70,6 +75,7 @@ export function useDeleteSeller() {
     mutationFn: (id: string) => sellerService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sellers"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "sellers"] });
       toast.success("Vendedor excluído com sucesso!");
     },
     onError: (err) => {

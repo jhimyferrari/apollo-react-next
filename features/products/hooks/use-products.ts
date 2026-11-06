@@ -4,7 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { productService } from "../services/product.service";
 import { parseApiError } from "@/lib/api/errors";
+import { useProductLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreProductRequest, UpdateProductRequest } from "../types";
+
+export { useProductLookup };
 
 export function useProducts(page = 1, perPage = 15) {
   return useQuery({
@@ -28,6 +31,7 @@ export function useCreateProduct() {
     mutationFn: (data: StoreProductRequest) => productService.create(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "products"] });
       toast.success(res?.message || "Produto cadastrado com sucesso!");
     },
     onError: (err) => {
@@ -52,6 +56,7 @@ export function useUpdateProduct() {
     }) => productService.update(id, diff),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "products"] });
       toast.success("Produto atualizado com sucesso!");
     },
     onError: (err) => {
@@ -70,6 +75,7 @@ export function useDeleteProduct() {
     mutationFn: (id: string) => productService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["lookups", "products"] });
       toast.success("Produto removido com sucesso!");
     },
     onError: (err) => {
