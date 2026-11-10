@@ -32,6 +32,7 @@ import { calculateDiff } from "@/lib/diff";
 import { applyApiValidationErrors, parseApiError } from "@/lib/api/errors";
 import type {
   ProductResource,
+  ProductStatus,
   ProductUnit,
   StoreProductRequest,
   UpdateProductRequest,
@@ -100,6 +101,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
+      status: initialData?.status
+        ? (initialData.status as ProductStatus)
+        : undefined,
       name: initialData?.name || "",
       description: initialData?.description || "",
       unit: (initialData?.unit as ProductUnit) || "un",
@@ -138,6 +142,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       // Cria objeto normalizado da versão atual e compara com a original
       // Não inclui stock_quantity pois estoque não pode ser atualizado via update de produto
       const currentPayload: UpdateProductRequest = {
+        status: formData.status || (initialData.status as ProductStatus),
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
         unit: formData.unit,
@@ -150,6 +155,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       };
 
       const originalPayload: UpdateProductRequest = {
+        status: initialData.status as ProductStatus,
         name: initialData.name,
         description: initialData.description || null,
         unit: initialData.unit,
@@ -226,7 +232,11 @@ export function ProductForm({ initialData }: ProductFormProps) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-4xl" noValidate>
       {/* Dados Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div
+        className={`grid grid-cols-1 ${
+          isEditing ? "md:grid-cols-4" : "md:grid-cols-3"
+        } gap-6`}
+      >
         {/* Nome do Produto (Obrigatório, max 45) */}
         <div className="md:col-span-2 space-y-2">
           <Label htmlFor="name" className="text-sm font-medium">
@@ -271,6 +281,36 @@ export function ProductForm({ initialData }: ProductFormProps) {
           />
           <FormFieldError error={errors.unit} />
         </div>
+
+        {/* Status do Produto (Exibido apenas em Modo de Edição / Update) */}
+        {isEditing && (
+          <div className="space-y-2">
+            <Label htmlFor="status" className="text-sm font-medium">
+              Status do Produto
+            </Label>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select
+                  value={field.value || "active"}
+                  onValueChange={field.onChange}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="inactive">Inativo</SelectItem>
+                    <SelectItem value="discontinued">Descontinuado</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FormFieldError error={errors.status} />
+          </div>
+        )}
       </div>
 
       {/* Descrição */}

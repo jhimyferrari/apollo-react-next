@@ -2,8 +2,10 @@ import { z } from "zod";
 import { onlyDigits } from "@/lib/masks";
 
 export const productUnits = ["un", "kg", "cx", "l", "m"] as const;
+export const productStatuses = ["active", "inactive", "discontinued"] as const;
 
 export const productSchema = z.object({
+  status: z.enum(productStatuses).optional(),
   name: z
     .string()
     .min(1, "O nome do produto é obrigatório")

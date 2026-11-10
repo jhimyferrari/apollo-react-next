@@ -3,12 +3,19 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft, Save, Building2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormFieldError } from "@/components/common/form-field-error";
 import { AddressList } from "@/features/addresses/components/address-list";
 import { supplierSchema, type SupplierFormData } from "../schemas/supplier.schema";
@@ -16,7 +23,7 @@ import { useCreateSupplier, useUpdateSupplier } from "../hooks/use-suppliers";
 import { maskDocument, maskPhone, cleanDocument, onlyDigits } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
-import type { SupplierResource, UpdateSupplierRequest } from "../types";
+import type { SupplierResource, SupplierStatus, UpdateSupplierRequest } from "../types";
 
 interface SupplierFormProps {
   initialData?: SupplierResource;
@@ -39,6 +46,9 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
   } = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
     defaultValues: {
+      status: initialData?.status
+        ? (initialData.status as SupplierStatus)
+        : undefined,
       document: initialData?.document ? maskDocument(initialData.document) : "",
       legal_name: initialData?.legal_name || "",
       trade_name: initialData?.trade_name || "",
@@ -60,6 +70,7 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
 
       if (isEditing && initialData) {
         const currentPayload: UpdateSupplierRequest = {
+          status: formData.status || (initialData.status as SupplierStatus),
           document: sanitizedDoc,
           legal_name: formData.legal_name.trim(),
           trade_name: formData.trade_name.trim(),
@@ -69,6 +80,7 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
         };
 
         const originalPayload: UpdateSupplierRequest = {
+          status: initialData.status as SupplierStatus,
           document: cleanDocument(initialData.document),
           legal_name: initialData.legal_name,
           trade_name: initialData.trade_name,
@@ -224,6 +236,35 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
             />
             <FormFieldError error={errors.phone} />
           </div>
+
+          {/* Status do Fornecedor (Exibido apenas em Modo de Edição / Update) */}
+          {isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-sm font-medium">
+                Status do Fornecedor
+              </Label>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || "active"}
+                    onValueChange={field.onChange}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FormFieldError error={errors.status} />
+            </div>
+          )}
         </div>
 
         {/* Botões de Ação */}

@@ -3,12 +3,19 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft, Save, Building2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormFieldError } from "@/components/common/form-field-error";
 import { AddressList } from "@/features/addresses/components/address-list";
 import { clientSchema, type ClientFormData } from "../schemas/client.schema";
@@ -16,7 +23,7 @@ import { useCreateClient, useUpdateClient } from "../hooks/use-clients";
 import { maskDocument, maskPhone, cleanDocument, onlyDigits } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
-import type { ClientResource, UpdateClientRequest } from "../types";
+import type { ClientResource, ClientStatus, UpdateClientRequest } from "../types";
 
 interface ClientFormProps {
   initialData?: ClientResource;
@@ -39,6 +46,9 @@ export function ClientForm({ initialData }: ClientFormProps) {
   } = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
+      status: initialData?.status
+        ? (initialData.status as ClientStatus)
+        : undefined,
       document: initialData?.document ? maskDocument(initialData.document) : "",
       legal_name: initialData?.legal_name || "",
       trade_name: initialData?.trade_name || "",
@@ -60,6 +70,7 @@ export function ClientForm({ initialData }: ClientFormProps) {
 
       if (isEditing && initialData) {
         const currentPayload: UpdateClientRequest = {
+          status: formData.status || (initialData.status as ClientStatus),
           document: sanitizedDoc,
           legal_name: formData.legal_name.trim(),
           trade_name: formData.trade_name.trim(),
@@ -69,6 +80,7 @@ export function ClientForm({ initialData }: ClientFormProps) {
         };
 
         const originalPayload: UpdateClientRequest = {
+          status: initialData.status as ClientStatus,
           document: cleanDocument(initialData.document),
           legal_name: initialData.legal_name,
           trade_name: initialData.trade_name,
@@ -225,6 +237,35 @@ export function ClientForm({ initialData }: ClientFormProps) {
             />
             <FormFieldError error={errors.phone} />
           </div>
+
+          {/* Status do Cliente (Exibido apenas em Modo de Edição / Update) */}
+          {isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-sm font-medium">
+                Status do Cliente
+              </Label>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || "active"}
+                    onValueChange={field.onChange}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FormFieldError error={errors.status} />
+            </div>
+          )}
         </div>
 
         {/* Botões de Ação */}

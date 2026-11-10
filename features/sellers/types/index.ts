@@ -1,9 +1,11 @@
 import type { AddressResource } from "@/features/addresses/types";
 
+export type SellerStatus = "active" | "inactive";
+
 export interface SellerResource {
   id: string;
   number: number;
-  status: string;
+  status: SellerStatus | string;
   document: string;
   legal_name: string;
   trade_name: string;
@@ -29,6 +31,7 @@ export interface StoreSellerRequest {
 }
 
 export interface UpdateSellerRequest {
+  status?: SellerStatus;
   document?: string;
   legal_name?: string;
   trade_name?: string;
