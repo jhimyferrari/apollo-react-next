@@ -91,16 +91,15 @@ export function ClientForm({ initialData }: ClientFormProps) {
 
         const diff = calculateDiff(originalPayload, currentPayload);
 
-        if (Object.keys(diff).length > 0) {
-          diff.document = currentPayload.document;
-          diff.legal_name = currentPayload.legal_name;
-          diff.trade_name = currentPayload.trade_name;
-
-          await updateMutation.mutateAsync({
-            id: initialData.id,
-            data: diff,
-          });
+        if (Object.keys(diff).length === 0) {
+          router.push("/clients");
+          return;
         }
+
+        await updateMutation.mutateAsync({
+          id: initialData.id,
+          data: diff,
+        });
       } else {
         const res = await createMutation.mutateAsync({
           document: sanitizedDoc,

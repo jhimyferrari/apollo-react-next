@@ -44,13 +44,13 @@ export interface StoreProductRequest {
 
 export interface UpdateProductRequest {
   status?: ProductStatus;
-  name: string;
+  name?: string;
   description?: string | null;
-  unit: ProductUnit;
+  unit?: ProductUnit;
   ncm?: string | null;
   ean?: string | null;
-  cost_price: number;
-  sale_price: number;
+  cost_price?: number;
+  sale_price?: number;
   stock_quantity?: number | null;
   brand_id?: string | null;
   categories?: Array<{ id: string }> | null;

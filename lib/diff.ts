@@ -22,7 +22,10 @@ export function calculateDiff<T extends object>(
     const currVal = currRecord[key];
 
     // Normaliza undefined e null se ambos representarem ausência
-    if (origVal === undefined && currVal === undefined) {
+    if (
+      (origVal === undefined || origVal === null) &&
+      (currVal === undefined || currVal === null)
+    ) {
       continue;
     }
 

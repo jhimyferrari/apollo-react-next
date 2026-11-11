@@ -161,10 +161,13 @@ export function ProductForm({ initialData }: ProductFormProps) {
         unit: initialData.unit,
         cost_price: Number(defaultCostPrice.replace(",", ".")),
         sale_price: Number(defaultSalePrice.replace(",", ".")),
-        ncm: initialData.ncm?.code || null,
-        ean: initialData.ean || null,
+        ncm: initialData.ncm?.code ? onlyDigits(initialData.ncm.code) : null,
+        ean: initialData.ean ? onlyDigits(initialData.ean) : null,
         brand_id: initialData.brand?.id || null,
-        categories: initialData.categories?.map((c) => ({ id: c.id })) || null,
+        categories:
+          initialData.categories && initialData.categories.length > 0
+            ? initialData.categories.map((c) => ({ id: c.id }))
+            : null,
       };
 
       // REGRA: Telas de edição enviam apenas o que mudou (PATCH com diffs)
@@ -176,12 +179,12 @@ export function ProductForm({ initialData }: ProductFormProps) {
         return;
       }
 
-      // No OpenAPI e UpdateProductRequest, [name, unit, cost_price, sale_price] são required
-      // e cost_price / sale_price aceitam até 2 casas decimais no PATCH
-      diff.name = currentPayload.name;
-      diff.unit = currentPayload.unit;
-      diff.cost_price = Number(currentPayload.cost_price.toFixed(2));
-      diff.sale_price = Number(currentPayload.sale_price.toFixed(2));
+      if (diff.cost_price !== undefined) {
+        diff.cost_price = Number(diff.cost_price.toFixed(2));
+      }
+      if (diff.sale_price !== undefined) {
+        diff.sale_price = Number(diff.sale_price.toFixed(2));
+      }
 
       try {
         await updateMutation.mutateAsync({ id: initialData.id, diff });
