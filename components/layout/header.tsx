@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AccessibilityMenu } from "@/components/common/accessibility-menu";
 import { UserNav } from "./user-nav";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import {
@@ -19,6 +20,7 @@ import {
   FolderTree,
   ShieldCheck,
   LayoutDashboard,
+  BarChart3,
 } from "lucide-react";
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -30,6 +32,7 @@ const ROUTE_LABELS: Record<string, string> = {
   clients: "Clientes",
   sellers: "Vendedores",
   suppliers: "Fornecedores",
+  reports: "Relatórios",
   users: "Usuários",
   new: "Novo Cadastro",
 };
@@ -59,6 +62,7 @@ export function Header() {
     { name: "Clientes", href: "/clients", icon: Users, permission: "client.view" },
     { name: "Vendedores", href: "/sellers", icon: Briefcase, permission: "seller.view" },
     { name: "Fornecedores", href: "/suppliers", icon: Truck, permission: "supplier.view" },
+    { name: "Relatórios", href: "/reports", icon: BarChart3, permission: ["sales-order.view", "purchase-order.view"] },
     { name: "Usuários", href: "/users", icon: ShieldCheck, permission: "user.view" },
   ].filter((item) => !item.permission || can(item.permission));
 
@@ -86,8 +90,10 @@ export function Header() {
         </span>
       </div>
 
-      {/* Right Actions: Theme Toggle & UserNav */}
-      <div className="flex items-center gap-3">
+      {/* Right Actions: Accessibility, Theme Toggle & UserNav */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <AccessibilityMenu />
+
         <Button
           variant="ghost"
           size="icon"

@@ -44,6 +44,7 @@
 }
 
 :root {
+  --font-scale-factor: 1;
   --radius: 0.65rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -111,6 +112,98 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* ==========================================================================
+   ACESSIBILIDADE VISUAL: AUTOCONTRASTE (WCAG AAA) E ESCALA DE FONTE
+   ========================================================================== */
+
+/* Alto Contraste Claro */
+:root.high-contrast {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: #002884;
+  --primary-foreground: #ffffff;
+  --secondary: #e5e7eb;
+  --secondary-foreground: #000000;
+  --muted: #f3f4f6;
+  --muted-foreground: #111827;
+  --accent: #dbeafe;
+  --accent-foreground: #000000;
+  --destructive: #b91c1c;
+  --border: #000000;
+  --input: #000000;
+  --ring: #002884;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #002884;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dbeafe;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #000000;
+  --sidebar-ring: #002884;
+}
+
+/* Alto Contraste Escuro */
+.dark.high-contrast {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #09090b;
+  --card-foreground: #ffffff;
+  --popover: #09090b;
+  --popover-foreground: #ffffff;
+  --primary: #facc15;
+  --primary-foreground: #000000;
+  --secondary: #18181b;
+  --secondary-foreground: #ffffff;
+  --muted: #18181b;
+  --muted-foreground: #f4f4f5;
+  --accent: #27272a;
+  --accent-foreground: #facc15;
+  --destructive: #ff6b6b;
+  --border: #ffffff;
+  --input: #ffffff;
+  --ring: #facc15;
+  --sidebar: #000000;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #facc15;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #facc15;
+  --sidebar-border: #ffffff;
+  --sidebar-ring: #facc15;
+}
+
+/* Reforço estrutural quando Autocontraste está ativo */
+html.high-contrast *:focus-visible {
+  outline: 3px solid var(--ring) !important;
+  outline-offset: 2px !important;
+}
+
+html.high-contrast input,
+html.high-contrast select,
+html.high-contrast textarea,
+html.high-contrast [data-slot="select-trigger"],
+html.high-contrast [data-slot="card"] {
+  border-width: 1.5px;
+}
+
+html.high-contrast th {
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+/* Garante que classes utilitárias em px também acompanhem a escala de fonte */
+.text-\[10px\] {
+  font-size: calc(0.625rem * var(--font-scale-factor, 1));
+}
+
+.text-\[11px\] {
+  font-size: calc(0.6875rem * var(--font-scale-factor, 1));
 }
 
 @layer base {
