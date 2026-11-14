@@ -126,17 +126,31 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const onSubmit = async (formData: ProductFormData) => {
-    // Normaliza números sem perdas
-    const costNum = Number(formData.cost_price.replace(",", "."));
-    const saleNum = Number(formData.sale_price.replace(",", "."));
+    // Normaliza números mantendo precisão exata aceita pelo backend (4 decimais para preços, 3 para estoque)
+    const costNum = Number(Number(formData.cost_price.replace(",", ".")).toFixed(4));
+    const saleNum = Number(Number(formData.sale_price.replace(",", ".")).toFixed(4));
     const stockNum = formData.stock_quantity
-      ? Number(formData.stock_quantity.replace(",", "."))
+      ? Number(Number(formData.stock_quantity.replace(",", ".")).toFixed(3))
       : null;
 
     const payloadCategories =
       formData.category_ids && formData.category_ids.length > 0
         ? formData.category_ids.map((id) => ({ id }))
         : null;
+
+    const productKnownFields = [
+      "status",
+      "name",
+      "description",
+      "unit",
+      "cost_price",
+      "sale_price",
+      "stock_quantity",
+      "ncm",
+      "ean",
+      "brand_id",
+      "category_ids",
+    ] as const;
 
     if (isEditing && initialData) {
       // Cria objeto normalizado da versão atual e compara com a original
@@ -159,8 +173,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
         name: initialData.name,
         description: initialData.description || null,
         unit: initialData.unit,
-        cost_price: Number(defaultCostPrice.replace(",", ".")),
-        sale_price: Number(defaultSalePrice.replace(",", ".")),
+        cost_price: Number(Number(defaultCostPrice.replace(",", ".")).toFixed(4)),
+        sale_price: Number(Number(defaultSalePrice.replace(",", ".")).toFixed(4)),
         ncm: initialData.ncm?.code ? onlyDigits(initialData.ncm.code) : null,
         ean: initialData.ean ? onlyDigits(initialData.ean) : null,
         brand_id: initialData.brand?.id || null,
@@ -180,10 +194,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
       }
 
       if (diff.cost_price !== undefined) {
-        diff.cost_price = Number(diff.cost_price.toFixed(2));
+        diff.cost_price = Number(diff.cost_price.toFixed(4));
       }
       if (diff.sale_price !== undefined) {
-        diff.sale_price = Number(diff.sale_price.toFixed(2));
+        diff.sale_price = Number(diff.sale_price.toFixed(4));
       }
 
       try {
@@ -192,7 +206,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
       } catch (err) {
         const parsed = parseApiError(err);
         if (parsed.isValidationError) {
-          applyApiValidationErrors(parsed, setError);
+          applyApiValidationErrors(parsed, setError, {
+            knownFields: productKnownFields,
+          });
         }
       }
     } else {
@@ -216,7 +232,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
       } catch (err) {
         const parsed = parseApiError(err);
         if (parsed.isValidationError) {
-          applyApiValidationErrors(parsed, setError);
+          applyApiValidationErrors(parsed, setError, {
+            knownFields: productKnownFields,
+          });
         }
       }
     }

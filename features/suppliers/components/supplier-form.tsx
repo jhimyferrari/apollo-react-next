@@ -120,7 +120,17 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: [
+            "status",
+            "legal_name",
+            "trade_name",
+            "document",
+            "state_registration",
+            "email",
+            "phone",
+          ],
+        });
       }
     }
   };

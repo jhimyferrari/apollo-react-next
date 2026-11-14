@@ -72,7 +72,7 @@ export function CategoryForm({ initialData }: CategoryFormProps) {
       } else {
         await createMutation.mutateAsync({
           name: trimmedName,
-          ...(trimmedDescription ? { description: trimmedDescription } : {}),
+          description: trimmedDescription,
         });
       }
 
@@ -80,7 +80,9 @@ export function CategoryForm({ initialData }: CategoryFormProps) {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: ["name", "description"],
+        });
       }
     }
   };

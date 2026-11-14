@@ -371,7 +371,9 @@ export const userCreateSchema = z.object({
 });
 
 export const userUpdateSchema = z.object({
-  permissions: z.array(z.string()).min(0),
+  name: z.string().min(1, "O nome do usuário é obrigatório"),
+  email: z.string().min(1, "O e-mail é obrigatório").email("Informe um e-mail válido"),
+  permissions: z.array(z.string()).optional(),
 });
 
 export type UserCreateFormData = z.infer<typeof userCreateSchema>;

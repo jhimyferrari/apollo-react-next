@@ -1,5 +1,63 @@
 import { type FieldValues, type UseFormSetError, type Path } from "react-hook-form";
+import { toast } from "sonner";
 import type { ParsedApiError, RawApiErrorPayload } from "./types";
+
+const GLOBAL_NON_FIELD_KEYS = new Set([
+  "payload",
+  "item_id",
+  "organization_id",
+  "addressable_id",
+]);
+
+function normalizeBackendFieldAliases(fields: Record<string, string[]>): void {
+  // Normaliza chave singular 'permission' ou 'permissions.*' vinda do backend para 'permissions'
+  if (fields.permission?.length) {
+    if (!fields.permissions?.length) {
+      fields.permissions = fields.permission;
+    }
+    delete fields.permission;
+  }
+  for (const key of Object.keys(fields)) {
+    if (key.startsWith("permissions.")) {
+      if (!fields.permissions?.length && fields[key]?.length) {
+        fields.permissions = fields[key];
+      }
+      delete fields[key];
+    }
+  }
+
+  // Fallback defensivo caso alguma resposta retorne 'product_unit' no lugar de 'unit'
+  if (fields.product_unit?.length) {
+    if (!fields.unit?.length) {
+      fields.unit = fields.product_unit;
+    }
+    delete fields.product_unit;
+  }
+
+  // Produto registra categorias como 'category_ids' no react-hook-form
+  if (fields.categories?.length) {
+    if (!fields.category_ids?.length) {
+      fields.category_ids = fields.categories;
+    }
+    delete fields.categories;
+  }
+  for (const key of Object.keys(fields)) {
+    if (key.startsWith("categories.")) {
+      if (!fields.category_ids?.length && fields[key]?.length) {
+        fields.category_ids = fields[key];
+      }
+      delete fields[key];
+    }
+  }
+
+  // Fallback defensivo caso alguma resposta retorne 'starts_at' no lugar de 'started_at'
+  if (fields.starts_at?.length) {
+    if (!fields.started_at?.length) {
+      fields.started_at = fields.starts_at;
+    }
+    delete fields.starts_at;
+  }
+}
 
 /**
  * Utilitário central para normalização e tratamento de erros da API.
@@ -73,10 +131,7 @@ export function parseApiError(
       code = "NOT_FOUND";
     }
 
-    // Normaliza chave singular 'permission' vinda do backend para 'permissions'
-    if (fields.permission && !fields.permissions) {
-      fields.permissions = fields.permission;
-    }
+    normalizeBackendFieldAliases(fields);
 
     // Heurísticas adicionais para mapear campos quando a API retorna 422 / DUPLICATE_FIELD / INVALID_PASSWORD sem 'fields' estruturado
     if (
@@ -149,25 +204,81 @@ export function parseApiError(
 }
 
 /**
+ * Retorna a primeira mensagem de validação de campo encontrada, ou a mensagem geral do erro.
+ */
+export function getFirstValidationMessage(
+  parsedError: ParsedApiError,
+  fallbackMessage?: string
+): string {
+  for (const messages of Object.values(parsedError.fields || {})) {
+    if (messages && messages.length > 0 && messages[0]) {
+      return messages[0];
+    }
+  }
+  return (
+    parsedError.message ||
+    fallbackMessage ||
+    "Erro de validação nos dados enviados."
+  );
+}
+
+function isKnownFormField(
+  field: string,
+  knownFields?: ReadonlyArray<string>
+): boolean {
+  if (GLOBAL_NON_FIELD_KEYS.has(field)) {
+    return false;
+  }
+  if (!knownFields || knownFields.length === 0) {
+    return true;
+  }
+  return knownFields.some(
+    (known) => field === known || field.startsWith(`${known}.`)
+  );
+}
+
+/**
  * Conecta os erros da API diretamente ao react-hook-form.
+ * Quando há erros em campos não mapeados no formulário (ou globais como `payload`/`item_id`),
+ * exibe um toast com a mensagem específica para evitar falha silenciosa.
  * Retorna `true` se ao menos um campo foi mapeado no formulário, ou `false` caso contrário.
  */
 export function applyApiValidationErrors<T extends FieldValues>(
   parsedError: ParsedApiError,
-  setError: UseFormSetError<T>
+  setError: UseFormSetError<T>,
+  options?: {
+    knownFields?: ReadonlyArray<string>;
+    showToastOnUnmapped?: boolean;
+  }
 ): boolean {
   if (!parsedError.isValidationError || !parsedError.fields) {
     return false;
   }
 
   let appliedAny = false;
-  for (const [field, messages] of Object.entries(parsedError.fields)) {
-    if (messages && messages.length > 0) {
+  const unmappedMessages: string[] = [];
+  const entries = Object.entries(parsedError.fields);
+
+  for (const [field, messages] of entries) {
+    if (!messages || messages.length === 0) continue;
+
+    if (isKnownFormField(field, options?.knownFields)) {
       setError(field as Path<T>, {
         type: "server",
         message: messages[0],
       });
       appliedAny = true;
+    } else {
+      unmappedMessages.push(messages[0]);
+    }
+  }
+
+  const shouldToast = options?.showToastOnUnmapped !== false;
+  if (shouldToast) {
+    if (unmappedMessages.length > 0) {
+      toast.error(unmappedMessages[0]);
+    } else if (entries.length === 0 && parsedError.message) {
+      toast.error(parsedError.message);
     }
   }
 

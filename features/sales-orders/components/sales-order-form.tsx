@@ -106,7 +106,9 @@ export function SalesOrderForm() {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: ["client_id", "seller_id", "items"],
+        });
       }
     }
   };
@@ -292,7 +294,7 @@ export function SalesOrderForm() {
             );
           })}
         </div>
-        <FormFieldError error={errors.items?.root || errors.items} />
+        <FormFieldError error={errors.items?.root?.message || errors.items?.message} />
       </div>
 
       {/* Resumo do Pedido e Botão Salvar */}

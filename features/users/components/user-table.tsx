@@ -27,7 +27,7 @@ import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { formatDate } from "@/lib/formatters";
 import { useUsers, useDeleteUser } from "../hooks/use-users";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
-import { MoreHorizontal, ShieldCheck, Trash2, Plus, AlertCircle, Users } from "lucide-react";
+import { MoreHorizontal, Pencil, ShieldCheck, Trash2, Plus, AlertCircle, Users } from "lucide-react";
 import type { UserResource } from "../types";
 
 export function UserTable() {
@@ -130,6 +130,10 @@ export function UserTable() {
           <TableBody>
             {users.map((user) => {
               const permCount = user.permissions?.length || 0;
+              const isAdmin =
+                Boolean(user.is_administrator) ||
+                Boolean(user.permissions?.some((p) => p.name.startsWith("user.")));
+              const showRowActions = canEdit || (canDelete && !isAdmin);
 
               return (
                 <TableRow key={user.id}>
@@ -140,7 +144,7 @@ export function UserTable() {
                     {user.email}
                   </TableCell>
                   <TableCell>
-                    {user.is_administrator ? (
+                    {isAdmin ? (
                       <Badge variant="default" className="text-xs">
                         <ShieldCheck className="mr-1 h-3.5 w-3.5" />
                         Administrador
@@ -157,8 +161,8 @@ export function UserTable() {
                   </TableCell>
                   {hasActions && (
                     <TableCell className="text-center">
-                      {/* Administradores não têm permissões editáveis nem podem ser excluídos */}
-                      {!user.is_administrator && (
+                      {/* Administradores permitem edição cadastral (nome/e-mail), mas não podem ser excluídos */}
+                      {showRowActions && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -174,13 +178,13 @@ export function UserTable() {
                                 href={`/users/${user.id}`}
                                 className="cursor-pointer flex items-center"
                               >
-                                <ShieldCheck className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Gerenciar Permissões
+                                <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Editar Usuário
                               </Link>
                             </DropdownMenuItem>
                           )}
-                          {canEdit && canDelete && <DropdownMenuSeparator />}
-                          {canDelete && (
+                          {canEdit && canDelete && !isAdmin && <DropdownMenuSeparator />}
+                          {canDelete && !isAdmin && (
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive cursor-pointer"
                               onClick={() => setUserToDelete(user)}

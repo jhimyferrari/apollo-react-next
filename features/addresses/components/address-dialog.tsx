@@ -134,14 +134,13 @@ export function AddressDialog({
 
   const onSubmit = async (data: AddressFormData) => {
     try {
-      const payload = {
+      const basePayload = {
         street: data.street.trim(),
         number: data.number.trim(),
         neighborhood: data.neighborhood.trim(),
         complement: data.complement?.trim() || null,
         cep: onlyDigits(data.cep),
         city_ibge_code: data.city_ibge_code.trim(),
-        is_default: Boolean(data.is_default),
       };
 
       if (isEditing && initialData) {
@@ -154,10 +153,18 @@ export function AddressDialog({
           city_ibge_code: String(
             initialData.city?.ibge_code || initialData.city_ibge_code
           ),
-          is_default: Boolean(initialData.is_default),
         };
 
-        const diff = calculateDiff(originalPayload, payload);
+        const diff: UpdateAddressRequest = calculateDiff(
+          originalPayload,
+          basePayload
+        );
+
+        // Backend define o endereço como padrão sempre que `is_default` existe no PATCH,
+        // portanto só enviamos `is_default: true` quando explicitamente marcado.
+        if (Boolean(data.is_default) && !initialData.is_default) {
+          diff.is_default = true;
+        }
 
         if (Object.keys(diff).length === 0) {
           onOpenChange(false);
@@ -169,14 +176,28 @@ export function AddressDialog({
           data: diff,
         });
       } else {
-        await createMutation.mutateAsync(payload);
+        await createMutation.mutateAsync({
+          ...basePayload,
+          is_default: Boolean(data.is_default),
+        });
       }
 
       onOpenChange(false);
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: [
+            "cep",
+            "uf_ibge_code",
+            "city_ibge_code",
+            "street",
+            "number",
+            "neighborhood",
+            "complement",
+            "is_default",
+          ],
+        });
       }
     }
   };
@@ -340,10 +361,14 @@ export function AddressDialog({
               type="checkbox"
               checked={Boolean(isDefaultValue)}
               onChange={(e) => setValue("is_default", e.target.checked)}
-              disabled={isSubmitting}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              disabled={isSubmitting || (isEditing && Boolean(initialData?.is_default))}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
             />
-            <span>Definir como endereço padrão</span>
+            <span>
+              {isEditing && Boolean(initialData?.is_default)
+                ? "Endereço padrão atual"
+                : "Definir como endereço padrão"}
+            </span>
           </label>
 
           <DialogFooter className="pt-4 border-t border-border">

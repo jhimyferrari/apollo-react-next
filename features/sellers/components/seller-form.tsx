@@ -79,7 +79,9 @@ export function SellerForm({ initialData }: SellerFormProps) {
           state_registration: formData.state_registration?.trim() || null,
           email: formData.email?.trim() || null,
           phone: sanitizedPhone,
-          started_at: formData.started_at || null,
+          started_at:
+            formData.started_at ||
+            (initialData.started_at ? initialData.started_at.slice(0, 10) : null),
           ended_at: formData.ended_at || null,
         };
 
@@ -128,7 +130,19 @@ export function SellerForm({ initialData }: SellerFormProps) {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: [
+            "status",
+            "legal_name",
+            "trade_name",
+            "document",
+            "state_registration",
+            "email",
+            "phone",
+            "started_at",
+            "ended_at",
+          ],
+        });
       }
     }
   };
