@@ -46,5 +46,7 @@ export interface StoreUserRequest {
 }
 
 export interface UpdateUserRequest {
-  permissions: string[];
+  name?: string;
+  email?: string;
+  permissions?: string[];
 }

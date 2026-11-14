@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -26,6 +27,7 @@ import {
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
 import { formatDate, formatDateTime, formatQuantity } from "@/lib/formatters";
+import { parseApiError, getFirstValidationMessage } from "@/lib/api/errors";
 import { maskDocument, maskPhone, maskStock } from "@/lib/masks";
 import {
   useUpdateSalesOrder,
@@ -173,6 +175,24 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
   };
 
   const handleSaveDraft = async () => {
+    if (editItems.length === 0) {
+      toast.error("O pedido deve conter pelo menos 1 item.");
+      return;
+    }
+
+    for (let idx = 0; idx < editItems.length; idx++) {
+      const item = editItems[idx];
+      const qty = Number(item.quantity.replace(",", "."));
+      if (!item.product_id) {
+        toast.error(`Selecione um produto para o item #${idx + 1}.`);
+        return;
+      }
+      if (Number.isNaN(qty) || qty <= 0) {
+        toast.error(`Informe uma quantidade maior que zero para o item #${idx + 1}.`);
+        return;
+      }
+    }
+
     const payload: UpdateSalesOrderRequest = {};
 
     if (editClientId && editClientId !== order.client_id) {
@@ -192,7 +212,6 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
     editItems.forEach((item, idx) => {
       const itemNumber = idx + 1;
       const qty = Number(item.quantity.replace(",", "."));
-      if (!item.product_id || Number.isNaN(qty) || qty <= 0) return;
 
       if (!item.originalId) {
         toAdd.push({
@@ -200,22 +219,18 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
           number: itemNumber,
           quantity: qty,
         });
-      } else if (item.product_id !== item.originalProductId) {
-        toRemove.push(item.originalId);
-        toAdd.push({
-          product_id: item.product_id,
-          number: itemNumber,
-          quantity: qty,
-        });
-      } else if (
-        qty !== item.originalQuantity ||
-        itemNumber !== item.originalNumber
-      ) {
-        toUpdate.push({
-          id: item.originalId,
-          number: itemNumber,
-          quantity: qty,
-        });
+      } else {
+        const productChanged = item.product_id !== item.originalProductId;
+        const numberChanged = itemNumber !== item.originalNumber;
+        const quantityChanged = qty !== item.originalQuantity;
+        if (productChanged || numberChanged || quantityChanged) {
+          toUpdate.push({
+            id: item.originalId,
+            ...(productChanged ? { product_id: item.product_id } : {}),
+            ...(numberChanged ? { number: itemNumber } : {}),
+            ...(quantityChanged ? { quantity: qty } : {}),
+          });
+        }
       }
     });
 
@@ -235,8 +250,13 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
     try {
       await updateMutation.mutateAsync({ id: order.id, data: payload });
       setIsEditingDraft(false);
-    } catch {
-      // Erro tratado no hook
+    } catch (err) {
+      const parsed = parseApiError(err);
+      if (parsed.isValidationError) {
+        toast.error(
+          getFirstValidationMessage(parsed, "Não foi possível atualizar o pedido.")
+        );
+      }
     }
   };
 

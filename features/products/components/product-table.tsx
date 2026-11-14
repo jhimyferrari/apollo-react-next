@@ -74,7 +74,7 @@ export function ProductTable() {
   }
 
   if (isLoading) {
-    return <TableSkeleton rows={8} cols={hasActions ? 8 : 7} />;
+    return <TableSkeleton rows={8} cols={hasActions ? 9 : 8} />;
   }
 
   if (isError) {
@@ -127,6 +127,7 @@ export function ProductTable() {
               <TableHead className="text-right">Custo</TableHead>
               <TableHead className="text-right">Venda</TableHead>
               <TableHead>Marca / Categorias</TableHead>
+              <TableHead className="w-28">Status</TableHead>
               {hasActions && (
                 <TableHead className="w-16 text-center">Ações</TableHead>
               )}
@@ -210,6 +211,25 @@ export function ProductTable() {
                         </Badge>
                       ))}
                     </div>
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge
+                      variant={
+                        product.status === "active"
+                          ? "default"
+                          : product.status === "discontinued"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                      className="text-[10px]"
+                    >
+                      {product.status === "inactive"
+                        ? "Inativo"
+                        : product.status === "discontinued"
+                        ? "Descontinuado"
+                        : "Ativo"}
+                    </Badge>
                   </TableCell>
 
                   {hasActions && (

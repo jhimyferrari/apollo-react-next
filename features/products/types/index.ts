@@ -2,6 +2,7 @@ import type { BrandResource } from "@/features/brands/types";
 import type { CategoryResource } from "@/features/categories/types";
 
 export type ProductUnit = "un" | "kg" | "cx" | "l" | "m";
+export type ProductStatus = "active" | "inactive" | "discontinued";
 
 export interface NcmCodeResource {
   id: string;
@@ -14,7 +15,7 @@ export interface ProductResource {
   id: string;
   number: number;
   name: string;
-  status: string;
+  status: ProductStatus | string;
   description: string | null;
   unit: ProductUnit;
   ncm: NcmCodeResource | null;
@@ -42,13 +43,14 @@ export interface StoreProductRequest {
 }
 
 export interface UpdateProductRequest {
-  name: string;
+  status?: ProductStatus;
+  name?: string;
   description?: string | null;
-  unit: ProductUnit;
+  unit?: ProductUnit;
   ncm?: string | null;
   ean?: string | null;
-  cost_price: number;
-  sale_price: number;
+  cost_price?: number;
+  sale_price?: number;
   stock_quantity?: number | null;
   brand_id?: string | null;
   categories?: Array<{ id: string }> | null;

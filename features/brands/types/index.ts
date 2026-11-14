@@ -13,6 +13,6 @@ export interface StoreBrandRequest {
 }
 
 export interface UpdateBrandRequest {
-  name: string;
+  name?: string;
   description?: string | null;
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RegisterOrgForm } from "@/features/auth/components/register-org-form";
+import { AccessibilityMenu } from "@/components/common/accessibility-menu";
 import {
   Card,
   CardHeader,
@@ -15,7 +16,11 @@ export const metadata: Metadata = {
 
 export default function RegisterOrganizationPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-background">
+    <main className="min-h-screen flex flex-col p-6 bg-background">
+      <div className="flex justify-end mb-4">
+        <AccessibilityMenu />
+      </div>
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-center gap-2 mb-8">
           <div className="h-10 w-10 rounded-lg bg-emerald-500 flex items-center justify-center text-zinc-950 font-black text-xl shadow-md">
@@ -37,6 +42,7 @@ export default function RegisterOrganizationPage() {
             <RegisterOrgForm />
           </CardContent>
         </Card>
+      </div>
       </div>
     </main>
   );

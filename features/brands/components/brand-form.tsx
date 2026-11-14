@@ -45,12 +45,12 @@ export function BrandForm({ initialData }: BrandFormProps) {
   const onSubmit = async (formData: BrandFormData) => {
     try {
       const trimmedName = formData.name.trim();
-      const trimmedDescription = formData.description?.trim() || undefined;
+      const trimmedDescription = formData.description?.trim() || null;
 
       if (isEditing && initialData) {
         const currentPayload: UpdateBrandRequest = {
           name: trimmedName,
-          description: trimmedDescription || null,
+          description: trimmedDescription,
         };
 
         const originalPayload: UpdateBrandRequest = {
@@ -65,19 +65,14 @@ export function BrandForm({ initialData }: BrandFormProps) {
           return;
         }
 
-        const patchPayload: UpdateBrandRequest = {
-          name: trimmedName,
-          ...(trimmedDescription ? { description: trimmedDescription } : {}),
-        };
-
         await updateMutation.mutateAsync({
           id: initialData.id,
-          data: patchPayload,
+          data: diff,
         });
       } else {
         await createMutation.mutateAsync({
           name: trimmedName,
-          ...(trimmedDescription ? { description: trimmedDescription } : {}),
+          description: trimmedDescription,
         });
       }
 
@@ -85,7 +80,9 @@ export function BrandForm({ initialData }: BrandFormProps) {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: ["name", "description"],
+        });
       }
     }
   };

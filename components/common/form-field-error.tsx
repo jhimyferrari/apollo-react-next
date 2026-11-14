@@ -26,10 +26,30 @@ export function FormFieldError({ error, className = "" }: FormFieldErrorProps) {
 
   if (typeof error === "string") {
     message = error;
-  } else if (Array.isArray(error)) {
-    message = error.join(", ");
-  } else if (typeof error === "object" && "message" in error && typeof error.message === "string") {
+  } else if (
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim() !== ""
+  ) {
     message = error.message;
+  } else if (
+    typeof error === "object" &&
+    "root" in error &&
+    error.root &&
+    typeof error.root === "object" &&
+    "message" in error.root &&
+    typeof error.root.message === "string" &&
+    error.root.message.trim() !== ""
+  ) {
+    message = error.root.message;
+  } else if (Array.isArray(error)) {
+    const stringMessages = error.filter(
+      (item): item is string => typeof item === "string" && item.trim() !== ""
+    );
+    if (stringMessages.length > 0) {
+      message = stringMessages.join(", ");
+    }
   }
 
   if (!message) return null;

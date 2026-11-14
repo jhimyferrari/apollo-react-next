@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/features/auth/components/login-form";
+import { AccessibilityMenu } from "@/components/common/accessibility-menu";
 import {
   Card,
   CardHeader,
@@ -92,7 +93,11 @@ export default function LoginPage() {
       </div>
 
       {/* Coluna da direita: Formulário de Login */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 lg:p-16">
+      <div className="flex-1 flex flex-col p-6 sm:p-12 lg:p-16">
+        <div className="flex justify-end mb-4">
+          <AccessibilityMenu />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-md">
           {/* Mobile Branding */}
           <div className="flex lg:hidden items-center justify-center gap-2 mb-8">
@@ -115,6 +120,7 @@ export default function LoginPage() {
               <LoginForm />
             </CardContent>
           </Card>
+        </div>
         </div>
       </div>
     </main>

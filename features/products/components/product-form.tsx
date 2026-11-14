@@ -32,6 +32,7 @@ import { calculateDiff } from "@/lib/diff";
 import { applyApiValidationErrors, parseApiError } from "@/lib/api/errors";
 import type {
   ProductResource,
+  ProductStatus,
   ProductUnit,
   StoreProductRequest,
   UpdateProductRequest,
@@ -100,6 +101,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
+      status: initialData?.status
+        ? (initialData.status as ProductStatus)
+        : undefined,
       name: initialData?.name || "",
       description: initialData?.description || "",
       unit: (initialData?.unit as ProductUnit) || "un",
@@ -122,11 +126,11 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const onSubmit = async (formData: ProductFormData) => {
-    // Normaliza números sem perdas
-    const costNum = Number(formData.cost_price.replace(",", "."));
-    const saleNum = Number(formData.sale_price.replace(",", "."));
+    // Normaliza números mantendo precisão exata aceita pelo backend (4 decimais para preços, 3 para estoque)
+    const costNum = Number(Number(formData.cost_price.replace(",", ".")).toFixed(4));
+    const saleNum = Number(Number(formData.sale_price.replace(",", ".")).toFixed(4));
     const stockNum = formData.stock_quantity
-      ? Number(formData.stock_quantity.replace(",", "."))
+      ? Number(Number(formData.stock_quantity.replace(",", ".")).toFixed(3))
       : null;
 
     const payloadCategories =
@@ -134,10 +138,25 @@ export function ProductForm({ initialData }: ProductFormProps) {
         ? formData.category_ids.map((id) => ({ id }))
         : null;
 
+    const productKnownFields = [
+      "status",
+      "name",
+      "description",
+      "unit",
+      "cost_price",
+      "sale_price",
+      "stock_quantity",
+      "ncm",
+      "ean",
+      "brand_id",
+      "category_ids",
+    ] as const;
+
     if (isEditing && initialData) {
       // Cria objeto normalizado da versão atual e compara com a original
       // Não inclui stock_quantity pois estoque não pode ser atualizado via update de produto
       const currentPayload: UpdateProductRequest = {
+        status: formData.status || (initialData.status as ProductStatus),
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
         unit: formData.unit,
@@ -150,15 +169,19 @@ export function ProductForm({ initialData }: ProductFormProps) {
       };
 
       const originalPayload: UpdateProductRequest = {
+        status: initialData.status as ProductStatus,
         name: initialData.name,
         description: initialData.description || null,
         unit: initialData.unit,
-        cost_price: Number(defaultCostPrice.replace(",", ".")),
-        sale_price: Number(defaultSalePrice.replace(",", ".")),
-        ncm: initialData.ncm?.code || null,
-        ean: initialData.ean || null,
+        cost_price: Number(Number(defaultCostPrice.replace(",", ".")).toFixed(4)),
+        sale_price: Number(Number(defaultSalePrice.replace(",", ".")).toFixed(4)),
+        ncm: initialData.ncm?.code ? onlyDigits(initialData.ncm.code) : null,
+        ean: initialData.ean ? onlyDigits(initialData.ean) : null,
         brand_id: initialData.brand?.id || null,
-        categories: initialData.categories?.map((c) => ({ id: c.id })) || null,
+        categories:
+          initialData.categories && initialData.categories.length > 0
+            ? initialData.categories.map((c) => ({ id: c.id }))
+            : null,
       };
 
       // REGRA: Telas de edição enviam apenas o que mudou (PATCH com diffs)
@@ -170,12 +193,12 @@ export function ProductForm({ initialData }: ProductFormProps) {
         return;
       }
 
-      // No OpenAPI e UpdateProductRequest, [name, unit, cost_price, sale_price] são required
-      // e cost_price / sale_price aceitam até 2 casas decimais no PATCH
-      diff.name = currentPayload.name;
-      diff.unit = currentPayload.unit;
-      diff.cost_price = Number(currentPayload.cost_price.toFixed(2));
-      diff.sale_price = Number(currentPayload.sale_price.toFixed(2));
+      if (diff.cost_price !== undefined) {
+        diff.cost_price = Number(diff.cost_price.toFixed(4));
+      }
+      if (diff.sale_price !== undefined) {
+        diff.sale_price = Number(diff.sale_price.toFixed(4));
+      }
 
       try {
         await updateMutation.mutateAsync({ id: initialData.id, diff });
@@ -183,7 +206,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
       } catch (err) {
         const parsed = parseApiError(err);
         if (parsed.isValidationError) {
-          applyApiValidationErrors(parsed, setError);
+          applyApiValidationErrors(parsed, setError, {
+            knownFields: productKnownFields,
+          });
         }
       }
     } else {
@@ -207,7 +232,9 @@ export function ProductForm({ initialData }: ProductFormProps) {
       } catch (err) {
         const parsed = parseApiError(err);
         if (parsed.isValidationError) {
-          applyApiValidationErrors(parsed, setError);
+          applyApiValidationErrors(parsed, setError, {
+            knownFields: productKnownFields,
+          });
         }
       }
     }
@@ -226,7 +253,11 @@ export function ProductForm({ initialData }: ProductFormProps) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-4xl" noValidate>
       {/* Dados Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div
+        className={`grid grid-cols-1 ${
+          isEditing ? "md:grid-cols-4" : "md:grid-cols-3"
+        } gap-6`}
+      >
         {/* Nome do Produto (Obrigatório, max 45) */}
         <div className="md:col-span-2 space-y-2">
           <Label htmlFor="name" className="text-sm font-medium">
@@ -271,6 +302,36 @@ export function ProductForm({ initialData }: ProductFormProps) {
           />
           <FormFieldError error={errors.unit} />
         </div>
+
+        {/* Status do Produto (Exibido apenas em Modo de Edição / Update) */}
+        {isEditing && (
+          <div className="space-y-2">
+            <Label htmlFor="status" className="text-sm font-medium">
+              Status do Produto
+            </Label>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select
+                  value={field.value || "active"}
+                  onValueChange={field.onChange}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="inactive">Inativo</SelectItem>
+                    <SelectItem value="discontinued">Descontinuado</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FormFieldError error={errors.status} />
+          </div>
+        )}
       </div>
 
       {/* Descrição */}

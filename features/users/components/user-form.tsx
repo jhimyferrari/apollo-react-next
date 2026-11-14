@@ -41,11 +41,13 @@ import {
   permissionDomainGroups,
   availablePermissions,
   userCreateSchema,
+  userUpdateSchema,
   type UserCreateFormData,
+  type UserUpdateFormData,
 } from "../schemas/user.schema";
 import { useCreateUser, useUpdateUser } from "../hooks/use-users";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
-import type { UserResource, PermissionAction } from "../types";
+import type { UserResource, PermissionAction, UpdateUserRequest } from "../types";
 
 interface UserFormProps {
   initialData?: UserResource;
@@ -125,8 +127,11 @@ export function UserForm({ initialData }: UserFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [permissionsError, setPermissionsError] = useState<string | null>(null);
 
-  // Administradores têm acesso total e suas permissões não podem ser modificadas
-  const isAdminTarget = Boolean(initialData?.is_administrator);
+  // Administradores têm acesso total e suas permissões não podem ser modificadas.
+  // UserResource pode omitir `is_administrator` na listagem/busca, mas administradores possuem permissões `user.*`.
+  const isAdminTarget =
+    Boolean(initialData?.is_administrator) ||
+    Boolean(initialData?.permissions?.some((p) => p.name.startsWith("user.")));
 
   const createForm = useForm<UserCreateFormData>({
     resolver: zodResolver(userCreateSchema),
@@ -135,6 +140,15 @@ export function UserForm({ initialData }: UserFormProps) {
       email: "",
       password: "",
       permissions: [],
+    },
+  });
+
+  const updateForm = useForm<UserUpdateFormData>({
+    resolver: zodResolver(userUpdateSchema),
+    defaultValues: {
+      name: initialData?.name || "",
+      email: initialData?.email || "",
+      permissions: initialPermissionNames,
     },
   });
 
@@ -205,26 +219,52 @@ export function UserForm({ initialData }: UserFormProps) {
     }
   };
 
-  const handleUpdateSubmit = async () => {
+  const handleUpdateSubmit = async (formData: UserUpdateFormData) => {
     if (!initialData) return;
-    if (isAdminTarget) return;
     setPermissionsError(null);
+
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const payload: UpdateUserRequest = {};
+
+    if (trimmedName !== initialData.name) {
+      payload.name = trimmedName;
+    }
+    if (trimmedEmail !== initialData.email) {
+      payload.email = trimmedEmail;
+    }
+
+    if (!isAdminTarget) {
+      const sortedInitial = [...initialPermissionNames].sort();
+      const sortedSelected = [...selectedPermissions].sort();
+      const permissionsChanged =
+        sortedInitial.length !== sortedSelected.length ||
+        sortedInitial.some((perm, index) => perm !== sortedSelected[index]);
+
+      if (permissionsChanged) {
+        payload.permissions = selectedPermissions;
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      router.push("/users");
+      return;
+    }
+
     try {
       await updateMutation.mutateAsync({
         id: initialData.id,
-        data: {
-          permissions: selectedPermissions,
-        },
+        data: payload,
       });
 
       router.push("/users");
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        // O backend retorna a chave `permission` (singular), que não é um campo visível do formulário
-        setPermissionsError(
-          extractPermissionsError(parsed.fields) || parsed.message || "Não foi possível salvar as permissões."
-        );
+        applyApiValidationErrors(parsed, updateForm.setError, {
+          knownFields: ["name", "email", "permissions"],
+        });
+        setPermissionsError(extractPermissionsError(parsed.fields));
       }
     }
   };
@@ -232,23 +272,57 @@ export function UserForm({ initialData }: UserFormProps) {
   return (
     <div className="space-y-8 max-w-5xl">
       {isEditing && initialData ? (
-        /* Modo Edição de Permissões */
-        <div className="space-y-6">
+        /* Modo Edição de Usuário */
+        <form
+          onSubmit={updateForm.handleSubmit(handleUpdateSubmit)}
+          className="space-y-6"
+          noValidate
+        >
           <Card className="border border-border">
-            <CardHeader className="p-4 pb-2">
+            <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <User className="h-4 w-4 text-primary" />
-                Dados do Operador
+                {isAdminTarget ? "Dados do Administrador" : "Dados do Operador"}
               </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-              <div>
-                <div className="font-semibold text-foreground">{initialData.name}</div>
-                <div className="text-xs text-muted-foreground">{initialData.email}</div>
-              </div>
               <Badge variant="outline" className="w-fit text-xs">
                 ID: {initialData.id.slice(0, 8)}...
               </Badge>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name" className="text-sm font-medium">
+                  Nome Completo <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-name"
+                    placeholder="Ex.: Mariana Silva"
+                    className="pl-9"
+                    {...updateForm.register("name")}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <FormFieldError error={updateForm.formState.errors.name} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-email" className="text-sm font-medium">
+                  E-mail de Acesso <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    placeholder="operador@empresa.com.br"
+                    className="pl-9"
+                    {...updateForm.register("email")}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <FormFieldError error={updateForm.formState.errors.email} />
+              </div>
             </CardContent>
           </Card>
 
@@ -261,7 +335,7 @@ export function UserForm({ initialData }: UserFormProps) {
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   Administradores possuem acesso total ao sistema e suas permissões não
-                  podem ser modificadas.
+                  podem ser modificadas. Apenas nome e e-mail podem ser atualizados.
                 </p>
               </div>
             </div>
@@ -289,27 +363,21 @@ export function UserForm({ initialData }: UserFormProps) {
               </Link>
             </Button>
 
-            {!isAdminTarget && (
-              <Button
-                type="button"
-                onClick={handleUpdateSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando Permissões...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Salvar Permissões
-                  </>
-                )}
-              </Button>
-            )}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando Alterações...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Salvar Alterações
+                </>
+              )}
+            </Button>
           </div>
-        </div>
+        </form>
       ) : (
         /* Modo Criação de Novo Usuário */
         <form

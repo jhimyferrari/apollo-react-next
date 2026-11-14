@@ -1,7 +1,19 @@
 import { z } from "zod";
 import { cleanDocument } from "@/lib/masks";
 
+function getMaxStartedAtDateString(): string {
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 30);
+  const year = maxDate.getFullYear();
+  const month = String(maxDate.getMonth() + 1).padStart(2, "0");
+  const day = String(maxDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export const sellerStatuses = ["active", "inactive"] as const;
+
 export const sellerSchema = z.object({
+  status: z.enum(sellerStatuses).optional(),
   document: z
     .string()
     .min(1, "Documento (CPF ou CNPJ) é obrigatório")
@@ -26,7 +38,16 @@ export const sellerSchema = z.object({
       message: "E-mail inválido",
     }),
   phone: z.string().optional().nullable(),
-  started_at: z.string().optional().nullable(),
+  started_at: z
+    .string()
+    .optional()
+    .nullable()
+    .refine((val) => !val || val >= "1900-01-01", {
+      message: "A data de início deve ser igual ou posterior a 01/01/1900",
+    })
+    .refine((val) => !val || val <= getMaxStartedAtDateString(), {
+      message: "A data de início não pode ultrapassar 30 dias a partir de hoje",
+    }),
   ended_at: z.string().optional().nullable(),
 }).refine(
   (data) => {

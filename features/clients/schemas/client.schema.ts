@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { cleanDocument } from "@/lib/masks";
 
+export const clientStatuses = ["active", "inactive"] as const;
+
 export const clientSchema = z.object({
+  status: z.enum(clientStatuses).optional(),
   document: z
     .string()
     .min(1, "Documento (CPF ou CNPJ) é obrigatório")

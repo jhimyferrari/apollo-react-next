@@ -54,6 +54,7 @@ export interface UpdateSalesOrderRequest {
     to_add?: StoreSalesOrderItemInput[];
     to_update?: Array<{
       id: string;
+      product_id?: string;
       number?: number;
       quantity?: number;
     }>;

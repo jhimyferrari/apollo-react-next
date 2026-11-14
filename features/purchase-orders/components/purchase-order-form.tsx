@@ -103,7 +103,9 @@ export function PurchaseOrderForm() {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: ["supplier_id", "items"],
+        });
       }
     }
   };
@@ -262,7 +264,7 @@ export function PurchaseOrderForm() {
             );
           })}
         </div>
-        <FormFieldError error={errors.items?.root || errors.items} />
+        <FormFieldError error={errors.items?.root?.message || errors.items?.message} />
       </div>
 
       {/* Resumo e Botão Salvar */}

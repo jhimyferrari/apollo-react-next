@@ -49,6 +49,7 @@ export interface UpdatePurchaseOrderRequest {
     to_add?: StorePurchaseOrderItemInput[];
     to_update?: Array<{
       id: string;
+      product_id?: string;
       number?: number;
       quantity?: number;
     }>;

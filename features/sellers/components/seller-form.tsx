@@ -3,12 +3,19 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ArrowLeft, Save, Building2, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormFieldError } from "@/components/common/form-field-error";
 import { AddressList } from "@/features/addresses/components/address-list";
 import { sellerSchema, type SellerFormData } from "../schemas/seller.schema";
@@ -16,7 +23,7 @@ import { useCreateSeller, useUpdateSeller } from "../hooks/use-sellers";
 import { maskDocument, maskPhone, cleanDocument, onlyDigits } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
-import type { SellerResource, UpdateSellerRequest } from "../types";
+import type { SellerResource, SellerStatus, UpdateSellerRequest } from "../types";
 
 interface SellerFormProps {
   initialData?: SellerResource;
@@ -39,6 +46,9 @@ export function SellerForm({ initialData }: SellerFormProps) {
   } = useForm<SellerFormData>({
     resolver: zodResolver(sellerSchema),
     defaultValues: {
+      status: initialData?.status
+        ? (initialData.status as SellerStatus)
+        : undefined,
       document: initialData?.document ? maskDocument(initialData.document) : "",
       legal_name: initialData?.legal_name || "",
       trade_name: initialData?.trade_name || "",
@@ -62,17 +72,21 @@ export function SellerForm({ initialData }: SellerFormProps) {
 
       if (isEditing && initialData) {
         const currentPayload: UpdateSellerRequest = {
+          status: formData.status || (initialData.status as SellerStatus),
           document: sanitizedDoc,
           legal_name: formData.legal_name.trim(),
           trade_name: formData.trade_name.trim(),
           state_registration: formData.state_registration?.trim() || null,
           email: formData.email?.trim() || null,
           phone: sanitizedPhone,
-          started_at: formData.started_at || null,
+          started_at:
+            formData.started_at ||
+            (initialData.started_at ? initialData.started_at.slice(0, 10) : null),
           ended_at: formData.ended_at || null,
         };
 
         const originalPayload: UpdateSellerRequest = {
+          status: initialData.status as SellerStatus,
           document: cleanDocument(initialData.document),
           legal_name: initialData.legal_name,
           trade_name: initialData.trade_name,
@@ -85,16 +99,15 @@ export function SellerForm({ initialData }: SellerFormProps) {
 
         const diff = calculateDiff(originalPayload, currentPayload);
 
-        if (Object.keys(diff).length > 0) {
-          diff.document = currentPayload.document;
-          diff.legal_name = currentPayload.legal_name;
-          diff.trade_name = currentPayload.trade_name;
-
-          await updateMutation.mutateAsync({
-            id: initialData.id,
-            data: diff,
-          });
+        if (Object.keys(diff).length === 0) {
+          router.push("/sellers");
+          return;
         }
+
+        await updateMutation.mutateAsync({
+          id: initialData.id,
+          data: diff,
+        });
       } else {
         const res = await createMutation.mutateAsync({
           document: sanitizedDoc,
@@ -117,7 +130,19 @@ export function SellerForm({ initialData }: SellerFormProps) {
     } catch (err) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
-        applyApiValidationErrors(parsed, setError);
+        applyApiValidationErrors(parsed, setError, {
+          knownFields: [
+            "status",
+            "legal_name",
+            "trade_name",
+            "document",
+            "state_registration",
+            "email",
+            "phone",
+            "started_at",
+            "ended_at",
+          ],
+        });
       }
     }
   };
@@ -268,6 +293,35 @@ export function SellerForm({ initialData }: SellerFormProps) {
             </div>
             <FormFieldError error={errors.ended_at} />
           </div>
+
+          {/* Status do Vendedor (Exibido apenas em Modo de Edição / Update) */}
+          {isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-sm font-medium">
+                Status do Vendedor
+              </Label>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || "active"}
+                    onValueChange={field.onChange}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FormFieldError error={errors.status} />
+            </div>
+          )}
         </div>
 
         {/* Botões de Ação */}
