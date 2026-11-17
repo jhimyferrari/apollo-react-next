@@ -13,7 +13,7 @@ export interface ReportPaginationMeta {
 export type ReportDateField = "confirmed_at" | "created_at";
 export type ReportOrderDirection = "asc" | "desc";
 export type ReportOrderStatus = "draf" | "confirmed" | "cancelled";
-export type ReportPaymentStatus = "pending" | "paid";
+export type ReportPaymentStatus = "pending" | "paid" | "refunded" | "cancelled";
 
 /** Filtros aceitos pelos endpoints /v1/reports/*. */
 export interface ReportFilters {

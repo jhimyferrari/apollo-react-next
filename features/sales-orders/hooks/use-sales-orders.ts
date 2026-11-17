@@ -4,7 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { salesOrderService } from "../services/sales-order.service";
 import { parseApiError } from "@/lib/api/errors";
-import type { StoreSalesOrderRequest, UpdateSalesOrderRequest } from "../types";
+import type {
+  PaymentStatus,
+  StoreSalesOrderRequest,
+  UpdateSalesOrderRequest,
+} from "../types";
 
 export function useSalesOrders(page = 1, status?: string) {
   return useQuery({
@@ -123,6 +127,31 @@ export function useCancelSalesOrder() {
     onError: (err) => {
       const parsed = parseApiError(err);
       toast.error(parsed.message || "Erro ao cancelar pedido.");
+    },
+  });
+}
+
+export function useUpdateSalesOrderPaymentStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payment_status,
+    }: {
+      id: string;
+      payment_status: PaymentStatus;
+    }) => salesOrderService.updatePaymentStatus(id, payment_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      toast.success("Status de pagamento atualizado com sucesso!");
+    },
+    onError: (err) => {
+      const parsed = parseApiError(err);
+      toast.error(
+        parsed.message || "Não foi possível atualizar o status de pagamento."
+      );
     },
   });
 }

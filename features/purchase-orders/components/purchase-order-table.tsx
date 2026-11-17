@@ -28,10 +28,16 @@ import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
 import { formatDate } from "@/lib/formatters";
 import {
+  getAvailablePaymentAction,
+  getPaymentStatusDisplay,
+  type PaymentTransitionAction,
+} from "@/lib/orders/payment-status";
+import {
   usePurchaseOrders,
   useConfirmPurchaseOrder,
   useReopenPurchaseOrder,
   useCancelPurchaseOrder,
+  useUpdatePurchaseOrderPaymentStatus,
   useDeletePurchaseOrder,
 } from "../hooks/use-purchase-orders";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
@@ -45,6 +51,7 @@ import {
   Plus,
   AlertCircle,
   ShoppingBag,
+  CreditCard,
 } from "lucide-react";
 import type { PurchaseOrderResource } from "../types";
 
@@ -53,6 +60,10 @@ export function PurchaseOrderTable() {
   const [page, setPage] = useState(1);
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrderResource | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<PurchaseOrderResource | null>(null);
+  const [paymentActionTarget, setPaymentActionTarget] = useState<{
+    order: PurchaseOrderResource;
+    action: PaymentTransitionAction;
+  } | null>(null);
 
   const { can } = usePermissions();
   const canView = can("purchase-order.view");
@@ -65,6 +76,7 @@ export function PurchaseOrderTable() {
   const confirmMutation = useConfirmPurchaseOrder();
   const reopenMutation = useReopenPurchaseOrder();
   const cancelMutation = useCancelPurchaseOrder();
+  const updatePaymentStatusMutation = useUpdatePurchaseOrderPaymentStatus();
   const deleteMutation = useDeletePurchaseOrder();
 
   const orders = data?.data || [];
@@ -94,6 +106,19 @@ export function PurchaseOrderTable() {
     try {
       await cancelMutation.mutateAsync({ id: orderToCancel.id });
       setOrderToCancel(null);
+    } catch {
+      // Erro tratado no hook
+    }
+  };
+
+  const handlePaymentStatusConfirm = async () => {
+    if (!paymentActionTarget) return;
+    try {
+      await updatePaymentStatusMutation.mutateAsync({
+        id: paymentActionTarget.order.id,
+        payment_status: paymentActionTarget.action.targetStatus,
+      });
+      setPaymentActionTarget(null);
     } catch {
       // Erro tratado no hook
     }
@@ -223,12 +248,19 @@ export function PurchaseOrderTable() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge
-                      variant={order.payment_status === "paid" ? "default" : "outline"}
-                      className="text-[10px]"
-                    >
-                      {order.payment_status === "paid" ? "Pago" : "Pendente"}
-                    </Badge>
+                    {(() => {
+                      const paymentDisplay = getPaymentStatusDisplay(
+                        order.payment_status
+                      );
+                      return (
+                        <Badge
+                          variant={paymentDisplay.variant}
+                          className="text-[10px]"
+                        >
+                          {paymentDisplay.shortLabel}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(order.created_at)}
@@ -281,6 +313,30 @@ export function PurchaseOrderTable() {
                                 Reabrir Pedido
                               </DropdownMenuItem>
                             )}
+
+                          {canEdit &&
+                            (() => {
+                              const paymentAction = getAvailablePaymentAction(
+                                order.status,
+                                order.payment_status
+                              );
+                              if (!paymentAction) return null;
+                              return (
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() =>
+                                    setPaymentActionTarget({
+                                      order,
+                                      action: paymentAction,
+                                    })
+                                  }
+                                  disabled={updatePaymentStatusMutation.isPending}
+                                >
+                                  <CreditCard className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  {paymentAction.actionLabel}
+                                </DropdownMenuItem>
+                              );
+                            })()}
 
                           {canEdit && order.status !== "cancelled" && (
                             <DropdownMenuItem
@@ -346,6 +402,24 @@ export function PurchaseOrderTable() {
         variant="destructive"
         isLoading={deleteMutation.isPending}
         onConfirm={handleDeleteConfirm}
+      />
+
+      {/* Confirmação de Alteração de Pagamento */}
+      <ConfirmDialog
+        open={Boolean(paymentActionTarget)}
+        onOpenChange={(open) => !open && setPaymentActionTarget(null)}
+        title={paymentActionTarget?.action.dialogTitle || ""}
+        description={
+          paymentActionTarget
+            ? paymentActionTarget.action.dialogDescription(
+                paymentActionTarget.order.number
+              )
+            : ""
+        }
+        confirmLabel={paymentActionTarget?.action.confirmLabel}
+        variant={paymentActionTarget?.action.variant}
+        isLoading={updatePaymentStatusMutation.isPending}
+        onConfirm={handlePaymentStatusConfirm}
       />
     </div>
   );

@@ -29,6 +29,8 @@ export const STATUS_LABELS: Record<string, string> = {
 export const PAYMENT_LABELS: Record<string, string> = {
   pending: "Pendente",
   paid: "Pago",
+  refunded: "Estornado",
+  cancelled: "Cancelado",
 };
 
 const REPORT_NAV_ITEMS = [
@@ -303,11 +305,17 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export function PaymentBadge({ status }: { status: string }) {
+  const variant =
+    status === "paid"
+      ? "default"
+      : status === "refunded"
+        ? "secondary"
+        : status === "cancelled"
+          ? "destructive"
+          : "outline";
+
   return (
-    <Badge
-      variant={status === "paid" ? "default" : "outline"}
-      className="text-[10px]"
-    >
+    <Badge variant={variant} className="text-[10px]">
       {PAYMENT_LABELS[status] ?? status}
     </Badge>
   );

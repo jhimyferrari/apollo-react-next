@@ -26,14 +26,20 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
+import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
 import { formatDate, formatDateTime, formatQuantity } from "@/lib/formatters";
 import { parseApiError, getFirstValidationMessage } from "@/lib/api/errors";
 import { maskDocument, maskPhone, maskStock } from "@/lib/masks";
+import {
+  getAvailablePaymentAction,
+  getPaymentStatusDisplay,
+} from "@/lib/orders/payment-status";
 import {
   useUpdateSalesOrder,
   useConfirmSalesOrder,
   useReopenSalesOrder,
   useCancelSalesOrder,
+  useUpdateSalesOrderPaymentStatus,
   useDeleteSalesOrder,
 } from "../hooks/use-sales-orders";
 import {
@@ -45,7 +51,6 @@ import { extractLookupAmount } from "@/features/lookups/types";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import type {
   SalesOrderResource,
-  PaymentStatus,
   UpdateSalesOrderRequest,
 } from "../types";
 import {
@@ -63,6 +68,7 @@ import {
   X,
   Loader2,
   History,
+  CreditCard,
 } from "lucide-react";
 
 interface SalesOrderDetailsProps {
@@ -83,13 +89,11 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
   const router = useRouter();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isEditingDraft, setIsEditingDraft] = useState(false);
 
   const [editClientId, setEditClientId] = useState(order.client_id);
   const [editSellerId, setEditSellerId] = useState(order.seller_id);
-  const [editPaymentStatus, setEditPaymentStatus] = useState<PaymentStatus>(
-    order.payment_status
-  );
   const [editItems, setEditItems] = useState<EditableOrderItem[]>([]);
   const [removedItemIds, setRemovedItemIds] = useState<string[]>([]);
 
@@ -101,6 +105,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
   const confirmMutation = useConfirmSalesOrder();
   const reopenMutation = useReopenSalesOrder();
   const cancelMutation = useCancelSalesOrder();
+  const updatePaymentStatusMutation = useUpdateSalesOrderPaymentStatus();
   const deleteMutation = useDeleteSalesOrder();
 
   const { data: clientsData } = useClientLookup(undefined, isEditingDraft);
@@ -111,17 +116,23 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
   const sellers = sellersData?.data || [];
   const products = productsData?.data || [];
 
+  const paymentDisplay = getPaymentStatusDisplay(order.payment_status);
+  const paymentAction = getAvailablePaymentAction(
+    order.status,
+    order.payment_status
+  );
+
   const isActionPending =
     updateMutation.isPending ||
     confirmMutation.isPending ||
     reopenMutation.isPending ||
     cancelMutation.isPending ||
+    updatePaymentStatusMutation.isPending ||
     deleteMutation.isPending;
 
   const startEditingDraft = () => {
     setEditClientId(order.client_id);
     setEditSellerId(order.seller_id);
-    setEditPaymentStatus(order.payment_status);
     setRemovedItemIds([]);
     setEditItems(
       (order.items || []).map((it) => ({
@@ -200,9 +211,6 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
     }
     if (editSellerId && editSellerId !== order.seller_id) {
       payload.seller_id = editSellerId;
-    }
-    if (editPaymentStatus !== order.payment_status) {
-      payload.payment_status = editPaymentStatus;
     }
 
     const toAdd: NonNullable<UpdateSalesOrderRequest["items"]>["to_add"] = [];
@@ -329,10 +337,10 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
               {currentStatus.label}
             </Badge>
             <Badge
-              variant={order.payment_status === "paid" ? "default" : "outline"}
+              variant={paymentDisplay.variant}
               className="text-xs"
             >
-              {order.payment_status === "paid" ? "Pago" : "Pagamento Pendente"}
+              {paymentDisplay.label}
             </Badge>
             {order.replaces_order_id && (
               <Badge variant="outline" className="text-xs gap-1">
@@ -388,6 +396,18 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                 </Button>
               )}
 
+            {canEdit && !isEditingDraft && paymentAction && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowPaymentDialog(true)}
+                disabled={isActionPending}
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                {paymentAction.actionLabel}
+              </Button>
+            )}
+
             {canEdit && order.status !== "cancelled" && !isEditingDraft && (
               <Button
                 size="sm"
@@ -435,65 +455,62 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
             </Button>
           </CardHeader>
           <CardContent className="p-4 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Cliente</Label>
-                <Select
-                  value={editClientId}
-                  onValueChange={setEditClientId}
-                  disabled={isActionPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        #{c.number} - {c.name}
-                        {c.document ? ` (${maskDocument(c.document)})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-1.5">
+                  <Select
+                    value={editClientId}
+                    onValueChange={setEditClientId}
+                    disabled={isActionPending}
+                  >
+                    <SelectTrigger className="flex-1 min-w-0">
+                      <SelectValue placeholder="Selecione o cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          #{c.number} - {c.name}
+                          {c.document ? ` (${maskDocument(c.document)})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <ResourceCreateShortcut
+                    href="/clients/new"
+                    label="Cadastrar novo cliente"
+                    permission="client.create"
+                    disabled={isActionPending}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Vendedor</Label>
-                <Select
-                  value={editSellerId}
-                  onValueChange={setEditSellerId}
-                  disabled={isActionPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o vendedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sellers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        #{s.number} - {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Status de Pagamento</Label>
-                <Select
-                  value={editPaymentStatus}
-                  onValueChange={(val) =>
-                    setEditPaymentStatus(val as PaymentStatus)
-                  }
-                  disabled={isActionPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pagamento Pendente</SelectItem>
-                    <SelectItem value="paid">Pago</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-1.5">
+                  <Select
+                    value={editSellerId}
+                    onValueChange={setEditSellerId}
+                    disabled={isActionPending}
+                  >
+                    <SelectTrigger className="flex-1 min-w-0">
+                      <SelectValue placeholder="Selecione o vendedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sellers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          #{s.number} - {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <ResourceCreateShortcut
+                    href="/sellers/new"
+                    label="Cadastrar novo vendedor"
+                    permission="seller.create"
+                    disabled={isActionPending}
+                  />
+                </div>
               </div>
             </div>
 
@@ -525,7 +542,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                     <div className="md:col-span-1 font-mono text-xs text-muted-foreground">
                       #{idx + 1}
                     </div>
-                    <div className="md:col-span-6">
+                    <div className="md:col-span-6 flex items-center gap-1.5">
                       <Select
                         value={item.product_id}
                         onValueChange={(val) =>
@@ -533,7 +550,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                         }
                         disabled={isActionPending}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="flex-1 min-w-0">
                           <SelectValue placeholder="Selecione um produto..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -544,6 +561,12 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                           ))}
                         </SelectContent>
                       </Select>
+                      <ResourceCreateShortcut
+                        href="/products/new"
+                        label="Cadastrar novo produto"
+                        permission="product.create"
+                        disabled={isActionPending}
+                      />
                     </div>
                     <div className="md:col-span-2">
                       <Input
@@ -661,6 +684,16 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                 Confirmado em: {formatDateTime(order.confirmed_at)}
               </div>
             )}
+            {order.paid_at && (
+              <div className="text-xs text-emerald-600">
+                Pago em: {formatDateTime(order.paid_at)}
+              </div>
+            )}
+            {order.refunded_at && (
+              <div className="text-xs text-amber-600">
+                Estornado em: {formatDateTime(order.refunded_at)}
+              </div>
+            )}
             {order.cancelled_at && (
               <div className="text-xs text-destructive">
                 Cancelado em: {formatDateTime(order.cancelled_at)}
@@ -756,6 +789,29 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
         isLoading={deleteMutation.isPending}
         onConfirm={handleDelete}
       />
+
+      {paymentAction && (
+        <ConfirmDialog
+          open={showPaymentDialog}
+          onOpenChange={setShowPaymentDialog}
+          title={paymentAction.dialogTitle}
+          description={paymentAction.dialogDescription(order.number)}
+          confirmLabel={paymentAction.confirmLabel}
+          variant={paymentAction.variant}
+          isLoading={updatePaymentStatusMutation.isPending}
+          onConfirm={async () => {
+            try {
+              await updatePaymentStatusMutation.mutateAsync({
+                id: order.id,
+                payment_status: paymentAction.targetStatus,
+              });
+              setShowPaymentDialog(false);
+            } catch {
+              // Erro tratado no hook
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
