@@ -1,8 +1,12 @@
 import type { SupplierResource } from "@/features/suppliers/types";
 import type { ProductResource } from "@/features/products/types";
+import type {
+  OrderLifecycleStatus,
+  OrderPaymentStatus,
+} from "@/lib/orders/payment-status";
 
-export type OrderStatus = "draf" | "confirmed" | "cancelled";
-export type PaymentStatus = "pending" | "paid";
+export type OrderStatus = OrderLifecycleStatus;
+export type PaymentStatus = OrderPaymentStatus;
 
 export interface PurchaseOrderItemResource {
   id: string;
@@ -24,6 +28,8 @@ export interface PurchaseOrderResource {
   replaces_order_id: string | null;
   confirmed_at: string | null;
   cancelled_at: string | null;
+  paid_at: string | null;
+  refunded_at: string | null;
   cancellation_reason: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -44,7 +50,6 @@ export interface StorePurchaseOrderRequest {
 
 export interface UpdatePurchaseOrderRequest {
   supplier_id?: string;
-  payment_status?: PaymentStatus;
   items?: {
     to_add?: StorePurchaseOrderItemInput[];
     to_update?: Array<{

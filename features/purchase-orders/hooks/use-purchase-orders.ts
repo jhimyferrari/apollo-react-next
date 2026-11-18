@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { purchaseOrderService } from "../services/purchase-order.service";
 import { parseApiError } from "@/lib/api/errors";
 import type {
+  PaymentStatus,
   StorePurchaseOrderRequest,
   UpdatePurchaseOrderRequest,
 } from "../types";
@@ -127,6 +128,31 @@ export function useCancelPurchaseOrder() {
     onError: (err) => {
       const parsed = parseApiError(err);
       toast.error(parsed.message || "Erro ao cancelar pedido.");
+    },
+  });
+}
+
+export function useUpdatePurchaseOrderPaymentStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payment_status,
+    }: {
+      id: string;
+      payment_status: PaymentStatus;
+    }) => purchaseOrderService.updatePaymentStatus(id, payment_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      toast.success("Status de pagamento atualizado com sucesso!");
+    },
+    onError: (err) => {
+      const parsed = parseApiError(err);
+      toast.error(
+        parsed.message || "Não foi possível atualizar o status de pagamento."
+      );
     },
   });
 }

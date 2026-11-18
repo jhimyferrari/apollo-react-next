@@ -1,9 +1,13 @@
 import type { ClientResource } from "@/features/clients/types";
 import type { SellerResource } from "@/features/sellers/types";
 import type { ProductResource } from "@/features/products/types";
+import type {
+  OrderLifecycleStatus,
+  OrderPaymentStatus,
+} from "@/lib/orders/payment-status";
 
-export type OrderStatus = "draf" | "confirmed" | "cancelled";
-export type PaymentStatus = "pending" | "paid";
+export type OrderStatus = OrderLifecycleStatus;
+export type PaymentStatus = OrderPaymentStatus;
 
 export interface SalesOrderItemResource {
   id: string;
@@ -26,6 +30,8 @@ export interface SalesOrderResource {
   replaces_order_id: string | null;
   confirmed_at: string | null;
   cancelled_at: string | null;
+  paid_at: string | null;
+  refunded_at: string | null;
   cancellation_reason: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -49,7 +55,6 @@ export interface StoreSalesOrderRequest {
 export interface UpdateSalesOrderRequest {
   client_id?: string;
   seller_id?: string;
-  payment_status?: PaymentStatus;
   items?: {
     to_add?: StoreSalesOrderItemInput[];
     to_update?: Array<{

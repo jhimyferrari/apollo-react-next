@@ -52,6 +52,8 @@ const STATUS_OPTIONS = [
 const PAYMENT_OPTIONS = [
   { value: "pending", label: "Pendente" },
   { value: "paid", label: "Pago" },
+  { value: "refunded", label: "Estornado" },
+  { value: "cancelled", label: "Cancelado" },
 ];
 
 const DATE_FIELD_OPTIONS = [

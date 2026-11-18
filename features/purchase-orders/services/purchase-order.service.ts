@@ -7,6 +7,7 @@ import type {
   StorePurchaseOrderRequest,
   UpdatePurchaseOrderRequest,
   ReopenPurchaseOrderResponse,
+  PaymentStatus,
 } from "../types";
 
 export const purchaseOrderService = {
@@ -89,6 +90,12 @@ export const purchaseOrderService = {
 
   update(id: string, data: UpdatePurchaseOrderRequest) {
     return apiClient.patch<void>(`/v1/purchase-orders/${id}`, data);
+  },
+
+  updatePaymentStatus(id: string, payment_status: PaymentStatus) {
+    return apiClient.patch<void>(`/v1/purchase-orders/${id}/payment-status`, {
+      payment_status,
+    });
   },
 
   confirm(id: string) {

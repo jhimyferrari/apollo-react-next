@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormFieldError } from "@/components/common/form-field-error";
+import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
 import { MoneyDisplay } from "@/components/common/money-display";
 import {
   purchaseOrderSchema,
@@ -118,25 +119,33 @@ export function PurchaseOrderForm() {
           <Label htmlFor="supplier_id" className="text-sm font-medium">
             Fornecedor <span className="text-destructive">*</span>
           </Label>
-          <Select
-            value={supplierIdValue}
-            onValueChange={(val) =>
-              setValue("supplier_id", val, { shouldValidate: true })
-            }
-            disabled={isLoadingSuppliers || isSubmitting}
-          >
-            <SelectTrigger id="supplier_id">
-              <SelectValue placeholder="Selecione o fornecedor" />
-            </SelectTrigger>
-            <SelectContent>
-              {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  #{s.number} - {s.name}
-                  {s.document ? ` (${maskDocument(s.document)})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={supplierIdValue}
+              onValueChange={(val) =>
+                setValue("supplier_id", val, { shouldValidate: true })
+              }
+              disabled={isLoadingSuppliers || isSubmitting}
+            >
+              <SelectTrigger id="supplier_id" className="flex-1 min-w-0">
+                <SelectValue placeholder="Selecione o fornecedor" />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    #{s.number} - {s.name}
+                    {s.document ? ` (${maskDocument(s.document)})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ResourceCreateShortcut
+              href="/suppliers/new"
+              label="Cadastrar novo fornecedor"
+              permission="supplier.create"
+              disabled={isSubmitting}
+            />
+          </div>
           <FormFieldError error={errors.supplier_id} />
         </div>
       </div>
@@ -188,22 +197,30 @@ export function PurchaseOrderForm() {
                   {/* Seleção de Produto */}
                   <div className="md:col-span-5 space-y-1">
                     <Label className="text-xs font-medium">Produto</Label>
-                    <Select
-                      value={watchedItems[index]?.product_id || ""}
-                      onValueChange={(val) => handleProductChange(index, val)}
-                      disabled={isLoadingProducts || isSubmitting}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um produto..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            #{p.number} - {p.name} ({p.unit.toUpperCase()})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-1.5">
+                      <Select
+                        value={watchedItems[index]?.product_id || ""}
+                        onValueChange={(val) => handleProductChange(index, val)}
+                        disabled={isLoadingProducts || isSubmitting}
+                      >
+                        <SelectTrigger className="flex-1 min-w-0">
+                          <SelectValue placeholder="Selecione um produto..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              #{p.number} - {p.name} ({p.unit.toUpperCase()})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <ResourceCreateShortcut
+                        href="/products/new"
+                        label="Cadastrar novo produto"
+                        permission="product.create"
+                        disabled={isSubmitting}
+                      />
+                    </div>
                     <FormFieldError error={errors.items?.[index]?.product_id} />
                   </div>
 

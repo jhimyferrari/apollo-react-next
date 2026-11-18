@@ -8,6 +8,7 @@ import type {
   StoreSalesOrderRequest,
   UpdateSalesOrderRequest,
   ReopenSalesOrderResponse,
+  PaymentStatus,
 } from "../types";
 
 export const salesOrderService = {
@@ -129,6 +130,12 @@ export const salesOrderService = {
 
   update(id: string, data: UpdateSalesOrderRequest) {
     return apiClient.patch<void>(`/v1/sales-orders/${id}`, data);
+  },
+
+  updatePaymentStatus(id: string, payment_status: PaymentStatus) {
+    return apiClient.patch<void>(`/v1/sales-orders/${id}/payment-status`, {
+      payment_status,
+    });
   },
 
   confirm(id: string) {
