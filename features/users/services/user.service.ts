@@ -4,6 +4,7 @@ import type {
   UserResource,
   StoreUserRequest,
   UpdateUserRequest,
+  UpdateOwnPasswordRequest,
 } from "../types";
 
 export const userService = {
@@ -24,6 +25,10 @@ export const userService = {
 
   update(id: string, data: UpdateUserRequest) {
     return apiClient.patch<void>(`/v1/users/${id}`, data);
+  },
+
+  updateOwnPassword(data: UpdateOwnPasswordRequest) {
+    return apiClient.patch<void>("/v1/users/me/password", data);
   },
 
   delete(id: string) {

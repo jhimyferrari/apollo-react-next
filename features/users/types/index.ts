@@ -48,5 +48,11 @@ export interface StoreUserRequest {
 export interface UpdateUserRequest {
   name?: string;
   email?: string;
+  password?: string;
   permissions?: string[];
+}
+
+export interface UpdateOwnPasswordRequest {
+  current_password: string;
+  password: string;
 }

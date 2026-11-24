@@ -26,13 +26,27 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { formatDate } from "@/lib/formatters";
 import { useUsers, useDeleteUser } from "../hooks/use-users";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
-import { MoreHorizontal, Pencil, ShieldCheck, Trash2, Plus, AlertCircle, Users } from "lucide-react";
+import { ChangeOwnPasswordDialog } from "./change-own-password-dialog";
+import {
+  MoreHorizontal,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  Plus,
+  AlertCircle,
+  Users,
+  KeyRound,
+} from "lucide-react";
 import type { UserResource } from "../types";
 
 export function UserTable() {
   const [page, setPage] = useState(1);
   const [userToDelete, setUserToDelete] = useState<UserResource | null>(null);
+  const [showOwnPasswordDialog, setShowOwnPasswordDialog] = useState(false);
+
+  const { user: currentUser } = useAuth();
 
   const { can } = usePermissions();
   const canView = can("user.view");
@@ -133,12 +147,18 @@ export function UserTable() {
               const isAdmin =
                 Boolean(user.is_administrator) ||
                 Boolean(user.permissions?.some((p) => p.name.startsWith("user.")));
-              const showRowActions = canEdit || (canDelete && !isAdmin);
+              const isSelf = Boolean(currentUser?.id && user.id === currentUser.id);
+              const showRowActions = canEdit || (canDelete && !isAdmin && !isSelf);
 
               return (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium text-foreground">
-                    {user.name}
+                    <span>{user.name}</span>
+                    {isSelf && (
+                      <Badge variant="secondary" className="ml-2 text-[10px]">
+                        Você
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {user.email}
@@ -161,7 +181,7 @@ export function UserTable() {
                   </TableCell>
                   {hasActions && (
                     <TableCell className="text-center">
-                      {/* Administradores permitem edição cadastral (nome/e-mail), mas não podem ser excluídos */}
+                      {/* Próprio usuário acessa alteração da própria senha; administradores não podem ser excluídos */}
                       {showRowActions && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -172,19 +192,28 @@ export function UserTable() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                          {canEdit && (
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/users/${user.id}`}
+                          {canEdit &&
+                            (isSelf ? (
+                              <DropdownMenuItem
                                 className="cursor-pointer flex items-center"
+                                onClick={() => setShowOwnPasswordDialog(true)}
                               >
-                                <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Editar Usuário
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
-                          {canEdit && canDelete && !isAdmin && <DropdownMenuSeparator />}
-                          {canDelete && !isAdmin && (
+                                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Alterar Minha Senha
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/users/${user.id}`}
+                                  className="cursor-pointer flex items-center"
+                                >
+                                  <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  Editar Usuário
+                                </Link>
+                              </DropdownMenuItem>
+                            ))}
+                          {canEdit && canDelete && !isAdmin && !isSelf && <DropdownMenuSeparator />}
+                          {canDelete && !isAdmin && !isSelf && (
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive cursor-pointer"
                               onClick={() => setUserToDelete(user)}
@@ -221,6 +250,11 @@ export function UserTable() {
         variant="destructive"
         isLoading={deleteMutation.isPending}
         onConfirm={handleDeleteConfirm}
+      />
+
+      <ChangeOwnPasswordDialog
+        open={showOwnPasswordDialog}
+        onOpenChange={setShowOwnPasswordDialog}
       />
     </div>
   );

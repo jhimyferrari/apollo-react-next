@@ -26,8 +26,12 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
-import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
-import { formatDate, formatDateTime, formatQuantity } from "@/lib/formatters";
+import {
+  extractMoneyAmount,
+  formatDate,
+  formatDateTime,
+  formatQuantity,
+} from "@/lib/formatters";
 import { parseApiError, getFirstValidationMessage } from "@/lib/api/errors";
 import { maskDocument, maskPhone, maskStock } from "@/lib/masks";
 import {
@@ -137,7 +141,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
         originalNumber: it.number,
         product_id: it.product_id,
         quantity: maskStock(String(it.quantity)),
-        unit_price: String(it.unit_price || "0"),
+        unit_price: extractMoneyAmount(it.unit_price, "0"),
       }))
     );
     setIsEditingDraft(true);
@@ -450,31 +454,23 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Fornecedor</Label>
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={editSupplierId}
-                    onValueChange={setEditSupplierId}
-                    disabled={isActionPending}
-                  >
-                    <SelectTrigger className="flex-1 min-w-0">
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          #{s.number} - {s.name}
-                          {s.document ? ` (${maskDocument(s.document)})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <ResourceCreateShortcut
-                    href="/suppliers/new"
-                    label="Cadastrar novo fornecedor"
-                    permission="supplier.create"
-                    disabled={isActionPending}
-                  />
-                </div>
+                <Select
+                  value={editSupplierId}
+                  onValueChange={setEditSupplierId}
+                  disabled={isActionPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o fornecedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        #{s.number} - {s.name}
+                        {s.document ? ` (${maskDocument(s.document)})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -506,7 +502,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
                     <div className="md:col-span-1 font-mono text-xs text-muted-foreground">
                       #{idx + 1}
                     </div>
-                    <div className="md:col-span-6 flex items-center gap-1.5">
+                    <div className="md:col-span-6">
                       <Select
                         value={item.product_id}
                         onValueChange={(val) =>
@@ -514,7 +510,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
                         }
                         disabled={isActionPending}
                       >
-                        <SelectTrigger className="flex-1 min-w-0">
+                        <SelectTrigger>
                           <SelectValue placeholder="Selecione um produto..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -525,12 +521,6 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
                           ))}
                         </SelectContent>
                       </Select>
-                      <ResourceCreateShortcut
-                        href="/products/new"
-                        label="Cadastrar novo produto"
-                        permission="product.create"
-                        disabled={isActionPending}
-                      />
                     </div>
                     <div className="md:col-span-2">
                       <Input

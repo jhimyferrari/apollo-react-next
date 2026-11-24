@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/common/empty-state";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { cn } from "@/lib/utils";
+import { extractMoneyAmount, formatBRL } from "@/lib/formatters";
 import type { ReportBreakdownEntry } from "../types";
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -162,6 +163,7 @@ const BREAKDOWN_BAR_COLORS: Record<string, string> = {
   paid: "bg-emerald-500",
   draf: "bg-amber-500",
   pending: "bg-amber-500",
+  refunded: "bg-sky-500",
   cancelled: "bg-rose-500",
 };
 
@@ -170,6 +172,7 @@ const BREAKDOWN_DOT_COLORS: Record<string, string> = {
   paid: "bg-emerald-500",
   draf: "bg-amber-500",
   pending: "bg-amber-500",
+  refunded: "bg-sky-500",
   cancelled: "bg-rose-500",
 };
 
@@ -196,14 +199,13 @@ export function BreakdownCard({
       entry: entries[key] ?? {
         count: 0,
         total: "0.0000",
-        total_formatted: "R$ 0,00",
       },
     }))
     .filter((r) => expectedKeys || r.entry.count > 0);
 
   const totalCount = rows.reduce((acc, r) => acc + r.entry.count, 0);
   const totalAmount = rows.reduce(
-    (acc, r) => acc + (Number(r.entry.total) || 0),
+    (acc, r) => acc + (Number(extractMoneyAmount(r.entry.total, "0")) || 0),
     0
   );
 
@@ -233,7 +235,7 @@ export function BreakdownCard({
         ) : (
           <ul className="space-y-3">
             {rows.map(({ key, entry }) => {
-              const amountNum = Number(entry.total) || 0;
+              const amountNum = Number(extractMoneyAmount(entry.total, "0")) || 0;
               const pct =
                 totalAmount > 0
                   ? Math.min(100, Math.max(0, (amountNum / totalAmount) * 100))
@@ -267,7 +269,7 @@ export function BreakdownCard({
                         %
                       </span>
                       <span className="font-semibold tabular-nums text-xs text-foreground">
-                        {entry.total_formatted}
+                        {formatBRL(entry.total)}
                       </span>
                     </div>
                   </div>

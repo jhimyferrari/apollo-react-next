@@ -1,5 +1,3 @@
-import { removeToken, notifyAuthChange } from "./token";
-
 export interface SessionUser {
   id: string;
   name: string;
@@ -11,48 +9,24 @@ export interface SessionUser {
   updated_at?: string | null;
 }
 
-const USER_KEY = "apollo_auth_user";
+const LEGACY_TOKEN_KEY = "apollo_auth_token";
+const LEGACY_USER_KEY = "apollo_auth_user";
 
-let cachedRawUser: string | null = null;
-let cachedParsedUser: SessionUser | null = null;
-
-export function getUserSession(): SessionUser | null {
+/**
+ * Remove credenciais legadas de localStorage e cookie não-HttpOnly
+ * durante a transição para o modelo BFF com cookie HttpOnly.
+ */
+export function clearLegacyClientAuthStorage(): void {
   if (typeof window === "undefined") {
-    return null;
+    return;
   }
-  const raw = localStorage.getItem(USER_KEY);
-  if (!raw) {
-    cachedRawUser = null;
-    cachedParsedUser = null;
-    return null;
-  }
-  if (raw === cachedRawUser) {
-    return cachedParsedUser;
-  }
+
   try {
-    cachedRawUser = raw;
-    cachedParsedUser = JSON.parse(raw) as SessionUser;
-    return cachedParsedUser;
+    window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+    window.localStorage.removeItem(LEGACY_USER_KEY);
   } catch {
-    cachedRawUser = null;
-    cachedParsedUser = null;
-    return null;
+    // Ignora caso localStorage esteja bloqueado
   }
-}
 
-export function setUserSession(user: SessionUser): void {
-  if (typeof window === "undefined") return;
-  const serialized = JSON.stringify(user);
-  cachedRawUser = serialized;
-  cachedParsedUser = user;
-  localStorage.setItem(USER_KEY, serialized);
-  notifyAuthChange();
-}
-
-export function clearSession(): void {
-  if (typeof window === "undefined") return;
-  cachedRawUser = null;
-  cachedParsedUser = null;
-  localStorage.removeItem(USER_KEY);
-  removeToken();
+  document.cookie = `${LEGACY_TOKEN_KEY}=; path=/; max-age=0; SameSite=Lax`;
 }

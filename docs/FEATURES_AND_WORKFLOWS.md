@@ -15,7 +15,9 @@ Este documento detalha o funcionamento operacional e técnico de **todos os mód
 7. [Parceiros Comerciais: Clientes (`clients`), Vendedores (`sellers`) e Fornecedores (`suppliers`)](#7-parceiros-comerciais-clientes-clients-vendedores-sellers-e-fornecedores-suppliers)
 8. [Gestão de Endereços Polimórficos e Seleção UF $\rightarrow$ Cidade IBGE (`addresses`)](#8-gestão-de-endereços-polimórficos-e-seleção-uf--cidade-ibge-addresses)
 9. [Pedidos de Venda (`sales-orders`) e Pedidos de Compra (`purchase-orders`)](#9-pedidos-de-venda-sales-orders-e-pedidos-de-compra-purchase-orders)
-10. [Tabela de Referência Rápida: Máscaras e Formatadores](#10-tabela-de-referência-rápida-máscaras-e-formatadores)
+10. [Endpoints de Lookup para Seletores (`lookups`)](#10-endpoints-de-lookup-para-seletores-lookups)
+11. [Relatórios Gerenciais (`reports`)](#11-relatórios-gerenciais-reports)
+12. [Tabela de Referência Rápida: Máscaras e Formatadores](#12-tabela-de-referência-rápida-máscaras-e-formatadores)
 
 ---
 
@@ -43,14 +45,14 @@ Localização: [`features/auth/`](file:///home/jhimy-ferrari/repos/apollo/apollo
 
 ### 2.1. Login (`/login`)
 * **Componente**: [`LoginForm`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/auth/components/login-form.tsx)
-* **Endpoint**: `POST /v1/login`
+* **Endpoint**: `POST /api/v1/login` (BFF) $\rightarrow$ `POST /v1/login` (Laravel)
 * **Campos e Regras**:
   * `organization_document`: CPF (11 dígitos) ou CNPJ (14 caracteres numéricos ou alfanuméricos). Aplicada máscara dinâmica via `maskDocument()` durante a digitação e enviado limpo via `cleanDocument()`.
   * `email`: E-mail válido do operador.
   * `password`: Senha de acesso.
 * **Comportamento Pós-Login**:
-  * Salva o Bearer token em `localStorage` e no cookie `apollo_auth_token`.
-  * Caso o payload de login não traga a relação completa de permissões de um usuário operador (`!user.is_administrator`), consulta complementarmente `GET /v1/users/{id}` para hidratar a sessão antes de redirecionar para `/`.
+  * O BFF armazena o token Sanctum em cookie `HttpOnly` cifrado (AES-256-GCM), sem expô-lo ao `localStorage` ou ao JavaScript, e retorna apenas o objeto `user` sanitizado.
+  * O [`AuthProvider`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/providers/auth-provider.tsx) hidrata a sessão e permissões em memória (revalidada no servidor via `GET /v1/me`) antes de redirecionar para `/`.
 
 ### 2.2. Cadastro de Organização (`/register-organization`)
 * **Componente**: [`RegisterOrgForm`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/auth/components/register-org-form.tsx)
@@ -87,16 +89,21 @@ Localização: [`features/users/`](file:///home/jhimy-ferrari/repos/apollo/apoll
   * `/users/new`: Criação de novo operador e atribuição visual de permissões.
   * `/users/[id]`: Edição de dados cadastrais, redefinição opcional de senha e atualização da matriz de permissões.
 * **Endpoints**:
-  * `GET /v1/users`, `GET /v1/users/{id}`, `POST /v1/users`, `PATCH /v1/users/{id}`, `DELETE /v1/users/{id}`.
+  * `GET /v1/me`, `GET /v1/users`, `GET /v1/users/{id}`, `POST /v1/users`, `PATCH /v1/users/{id}`, `DELETE /v1/users/{id}`, `PATCH /v1/users/me/password`.
 * **Matriz Interativa de Permissões ([`UserForm`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/users/components/user-form.tsx))**:
-  * Organiza as **36 permissões** em 9 cards de domínio (`user`, `product`, `brand`, `category`, `client`, `seller`, `supplier`, `sales-order`, `purchase-order`).
+  * Organiza as **32 permissões operacionais** atribuíveis em **8 cards de domínio** (`product`, `brand`, `category`, `client`, `seller`, `supplier`, `sales-order`, `purchase-order`). As 4 permissões de `user.*` são reservadas exclusivamente a administradores (`is_administrator` ou usuários com permissões `user.*`), cujas permissões não são editáveis pela matriz.
   * Oferece botões de ação rápida:
-    * **Selecionar Todas** (36 permissões)
-    * **Apenas Leitura** (as 9 permissões `*.view`)
+    * **Selecionar Todas** (32 permissões operacionais)
+    * **Apenas Leitura** (as 8 permissões `*.view` dos domínios operacionais)
     * **Limpar Todas**
     * **Alternar Domínio Individual** (marca/desmarca as 4 permissões de um card específico).
-* **Regras de Edição (`PATCH`)**:
-  * Utiliza `calculateDiff` para enviar apenas os campos modificados. Se os campos `password` e `password_confirmation` forem deixados em branco na edição, são omitidos do payload para manter a senha atual inalterada.
+* **Regras de Edição de Terceiros (`PATCH /v1/users/{id}`)**:
+  * Utiliza `calculateDiff` para enviar apenas os campos modificados (`name`, `email`, `permissions` para não-administradores e `password` opcional).
+  * **Redefinição de senha de terceiros**: A senha na edição é opcional e segue as regras de senha forte (mínimo 8 caracteres, com maiúscula, minúscula, número e símbolo). Se deixada em branco, é omitida do payload para manter a senha atual; quando informada, o backend revoga todos os tokens ativos do usuário alvo.
+  * **Proteção contra Autoedição**: O backend bloqueia autoedição em `PATCH /v1/users/{id}` (`403`). Na listagem (`UserTable`), o usuário logado exibe a badge `"Você"`, substitui a ação `"Editar Usuário"` por `"Alterar Minha Senha"` e oculta `"Excluir"`; no formulário (`UserForm`), os campos ficam desabilitados quando o alvo é o próprio usuário e é exibido o botão `"Alterar Minha Senha"`.
+* **Alteração da Própria Senha (`PATCH /v1/users/me/password`)**:
+  * Implementada pelo modal [`ChangeOwnPasswordDialog`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/users/components/change-own-password-dialog.tsx), acessível pelo menu do usuário (`UserNav`), pela tabela (`UserTable`) e pelo formulário (`UserForm`).
+  * Disponível para **qualquer usuário autenticado** (não exige `user.update`), solicita `current_password`, `password` (diferente da atual e dentro das regras de senha forte) e `password_confirmation` (validada no cliente), enviando `{ current_password, password }` para a API. O token da sessão atual permanece ativo enquanto os demais dispositivos são revogados.
 
 ---
 
@@ -158,7 +165,7 @@ Localizações: [`features/clients/`](file:///home/jhimy-ferrari/repos/apollo/ap
     * O campo `trade_name` (Nome Fantasia) fica disponível.
     * O campo `document_number` aplica máscara de CNPJ alfanumérico (`XX.XXX.XXX/XXXX-XX`).
 * **Particularidade de Vendedores (`sellers`)**:
-  * Possui o campo adicional `commission_percentage` (Percentual de Comissão de `0` a `100%`, suportando até 2 casas decimais).
+  * Possui o campo adicional `commission_percentage` (Percentual de Comissão de `0` a `100%`, suportando até 2 casas decimais) e `started_at` (data de início validada entre `1900-01-01` e até `+30 dias`; na edição, caso o campo seja limpo, o `started_at` original é preservado).
 * **Abas na Página de Detalhes (`/[id]`)**:
   * **Aba "Dados Cadastrais"**: Exibe documento formatado, tipo de pessoa, inscrição estadual, contatos, comissão (para vendedores) e datas de auditoria.
   * **Aba "Endereços"**: Renderiza o componente polimórfico [`AddressList`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/addresses/components/address-list.tsx) vinculado ao parceiro.
@@ -202,6 +209,7 @@ flowchart LR
    * `neighborhood`: Bairro (obrigatório, máx. 60 caracteres).
    * `complement`: Complemento (opcional, máx. 90 caracteres).
    * `description`: Rótulo identificador do endereço (opcional, ex.: `"Matriz"`, `"Entrega"`, `"Cobrança"`).
+   * `is_default`: Booleano indicando se é o endereço padrão do parceiro (enviado explicitamente no `POST`; na edição de um endereço já marcado como padrão, o checkbox permanece desabilitado com o rótulo `"Endereço padrão atual"`).
 
 ---
 
@@ -220,22 +228,24 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 | **Status do Pedido** | `"draf"` *(grafia literal da API)* | Rascunho | Neutro / Secundário |
 | **Status do Pedido** | `"confirmed"` | Confirmado | Verde / Sucesso |
 | **Status do Pedido** | `"cancelled"` | Cancelado | Vermelho / Destrutivo |
-| **Status de Pagamento** | `"pending"` | Pendente | Amarelo / Alerta |
-| **Status de Pagamento** | `"paid"` | Pago | Verde / Sucesso |
+| **Status de Pagamento** | `"pending"` | Pendente | Contorno / Neutro |
+| **Status de Pagamento** | `"paid"` | Pago | Padrão / Sucesso |
+| **Status de Pagamento** | `"refunded"` | Estornado | Secundário |
+| **Status de Pagamento** | `"cancelled"` | Cancelado | Vermelho / Destrutivo |
 
 ### 9.2. Criação de Pedido (`POST /v1/{sales|purchase}-orders`)
 * Todo pedido nasce no status `"draf"` (Rascunho).
-* O operador seleciona o parceiro comercial, status de pagamento (`pending` ou `paid`), observações (`notes`) e adiciona os itens (`product_id` e `quantity`).
-* A interface calcula em tempo real o subtotal estimado de cada linha e o total geral do pedido à medida que produtos e quantidades são alterados.
+* O operador seleciona o parceiro comercial, status de pagamento inicial (`pending` ou `paid`), observações (`notes`) e adiciona os itens (`product_id` e `quantity`).
+* A interface calcula e exibe em tempo real o subtotal estimado de cada linha e o total geral do pedido apenas para pré-visualização visual; **`subtotal` não é enviado no payload** de criação nem de edição, pois os cálculos oficiais são feitos exclusivamente pelo backend.
 
 ### 9.3. Edição de Pedido em Rascunho (`PATCH /v1/{sales|purchase}-orders/{id}`)
 * Apenas pedidos com `status === "draf"` podem ser editados.
 * O formulário calcula automaticamente:
-  1. As alterações de cabeçalho (`client_id`/`supplier_id`, `seller_id`, `payment_status`, `notes`).
-  2. O **diff estruturado de itens (`items`)** comparando a lista original do pedido com a lista presente no formulário:
+  1. As alterações de cabeçalho (`client_id`/`supplier_id`, `seller_id`, `notes`). O `payment_status` não é mais editado aqui, utilizando o endpoint dedicado abaixo.
+  2. O **diff estruturado de itens (`items`)** comparando a lista original do pedido com a lista presente no formulário (incluindo troca direta de `product_id` em itens de rascunho em `to_update`):
      ```json
      {
-       "payment_status": "paid",
+       "notes": "Entrega agendada",
        "items": {
          "to_add": [
            { "product_id": "uuid-novo-produto", "quantity": 5 }
@@ -268,6 +278,11 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
      * No pedido novo, exibe um card/badge informando que ele **Substitui o Pedido #X** (com link clicável).
    * **Alerta de Preços Desatualizados (`outdated_prices`)**:
      * Se algum item do pedido reaberto teve seu preço de catálogo alterado desde a negociação original, a resposta do endpoint `/reopen` retorna o array `outdated_prices` (contendo `product_id`, `name`, `negotiated_price` e `current_price`), que é destacado no topo da tela de detalhes para ciência do operador antes de reconfirmar o pedido.
+4. **Atualizar Status de Pagamento (`PATCH /v1/{orders}/{id}/payment-status`)**:
+   * Regras centralizadas em [`lib/orders/payment-status.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/orders/payment-status.ts) (`getAvailablePaymentAction`), acessíveis na listagem e no cabeçalho de detalhes, sempre mediante confirmação em `ConfirmDialog`:
+     * Quando `status === "draf"` ou `"confirmed"`: alterna entre `pending` $\rightarrow$ `paid` (*Marcar como Pago*) e `paid` $\rightarrow$ `pending` (*Reverter para Pendente*).
+     * Quando `status === "cancelled"` e `payment_status === "paid"`: permite apenas `paid` $\rightarrow$ `refunded` (*Estornar Pagamento*).
+   * A tela de detalhes também exibe os timestamps `paid_at` e `refunded_at` nos cards de datas do pedido.
 
 ---
 
@@ -306,7 +321,14 @@ Localização: [`features/reports/`](file:///home/jhimy-ferrari/repos/apollo/apo
 * **Navegação Rápida (`ReportNav`)**: Barra de abas presente em todas as telas de relatório para alternância imediata entre os relatórios disponíveis para o perfil do usuário.
 * **Filtros e Atalhos de Período** ([`ReportFilterBar`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/reports/components/report-filter-bar.tsx)):
   * **Atalhos rápidos de data**: *Hoje*, *Últimos 7 dias*, *Últimos 30 dias*, *Este mês*, *Mês passado*, *Este ano* e *Todo o período*.
-  * **Parâmetros**: período (`start_date`/`end_date`), `date_field` (`confirmed_at`/`created_at`), `status`, `payment_status`, cliente, vendedor, fornecedor, produto, categoria, marca, ordenação (`order_by`/`order_direction`) e quantidade por página (`per_page`: 15, 30, 50 ou 100).
+  * **Parâmetros**:
+    * Período (`start_date`/`end_date`) e campo de data (`date_field`: `confirmed_at`, `created_at`, `paid_at`, `refunded_at` ou `cancelled_at`).
+    * Status do pedido (`status`: `draf`, `confirmed`, `cancelled`, `all` — padrão *"Padrão (automático)"*, no qual o backend infere `cancelled` ao filtrar `payment_status=refunded` ou `cancelled` sem `status` explícito).
+    * Status de pagamento (`payment_status`: `pending`, `paid`, `refunded` ou `cancelled`), disponível tanto nos resumos (`sales/summary`, `purchases/summary`) quanto nos relatórios agrupados (`sales/by-product`, `sales/by-seller`).
+    * Demais filtros por parceiro/catálogo (cliente, vendedor, fornecedor, produto, categoria, marca), ordenação (`order_by`/`order_direction`) e paginação (`per_page`: 15, 30, 50 ou 100).
+* **Estornos Pendentes e Datas Financeiras**:
+  * Quando os totais de resumo retornam `pending_refund` (`status === "cancelled"` e `payment_status === "paid"`), um banner de alerta é exibido com o botão de filtro rápido **"Filtrar estornos pendentes"**.
+  * As tabelas de resumo exibem as datas financeiras e de ciclo de vida (`paid_at`, `refunded_at`, `cancelled_at`) e consomem todos os valores monetários no formato `Money` (`{ amount, currency, formatted }`).
 * **Seletores de Entidade via Lookups**: Utilizam `/v1/lookups/*` com `status=all`, exibindo código sequencial (`#number`), nome e documento formatado, respeitando as permissões compostas do `LookupController`.
 * **Ordenação Interativa e Curva de Participação**: Nos relatórios agrupados (*Vendas por Produto* e *Vendas por Vendedor*), os cabeçalhos das colunas numéricas permitem alternar a ordenação com um clique, exibindo posição no ranking (`1º`, `2º`, `3º`...) e barra visual de participação percentual no faturamento.
 
@@ -316,7 +338,8 @@ Localização: [`features/reports/`](file:///home/jhimy-ferrari/repos/apollo/apo
 
 | Finalidade | Função | Arquivo | Exemplo de Entrada | Resultado Formatado |
 | :--- | :--- | :--- | :--- | :--- |
-| **Moeda Brasileira (BRL)** | `formatBRL(value)` | [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts) | `"1250.5"` / `"9.8765"` | `"R$ 1.250,50"` / `"R$ 9,8765"` |
+| **Moeda Brasileira (BRL)** | `formatBRL(value)` | [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts) | `{ amount: "1250.5" }` / `"9.8765"` | `"R$ 1.250,50"` / `"R$ 9,8765"` |
+| **Extrator Numérico `Money`** | `extractMoneyAmount(value)` | [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts) | `{ amount: "1250.50" }` | `"1250.50"` |
 | **Data e Hora (pt-BR)** | `formatDateTime(iso)` | [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts) | `"2026-10-09T15:00:00Z"` | `"09/10/2026, 12:00"` |
 | **Data Curta (pt-BR)** | `formatDate(iso)` | [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts) | `"2026-10-09T15:00:00Z"` | `"09/10/2026"` |
 | **Quantidade + Unidade** | `formatQuantity(qty, unit)` | [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts) | `(12.5, "kg")` | `"12,5 kg"` |

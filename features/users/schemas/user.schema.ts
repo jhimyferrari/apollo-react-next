@@ -356,25 +356,44 @@ export const availablePermissions: PermissionDefinition[] =
     group.permissions.delete,
   ]);
 
+const strongPasswordSchema = z
+  .string()
+  .min(1, "A senha é obrigatória")
+  .min(8, "A senha deve conter no mínimo 8 caracteres")
+  .regex(/[A-Z]/, "A senha deve conter ao menos uma letra maiúscula")
+  .regex(/[a-z]/, "A senha deve conter ao menos uma letra minúscula")
+  .regex(/[0-9]/, "A senha deve conter ao menos um número")
+  .regex(/[^A-Za-z0-9]/, "A senha deve conter ao menos um caractere especial");
+
 export const userCreateSchema = z.object({
   name: z.string().min(1, "O nome do usuário é obrigatório"),
   email: z.string().min(1, "O e-mail é obrigatório").email("Informe um e-mail válido"),
-  password: z
-    .string()
-    .min(1, "A senha é obrigatória")
-    .min(8, "A senha deve conter no mínimo 8 caracteres")
-    .regex(/[A-Z]/, "A senha deve conter ao menos uma letra maiúscula")
-    .regex(/[a-z]/, "A senha deve conter ao menos uma letra minúscula")
-    .regex(/[0-9]/, "A senha deve conter ao menos um número")
-    .regex(/[^A-Za-z0-9]/, "A senha deve conter ao menos um caractere especial"),
+  password: strongPasswordSchema,
   permissions: z.array(z.string()).optional(),
 });
 
 export const userUpdateSchema = z.object({
   name: z.string().min(1, "O nome do usuário é obrigatório"),
   email: z.string().min(1, "O e-mail é obrigatório").email("Informe um e-mail válido"),
+  password: z.union([z.literal(""), strongPasswordSchema]).optional(),
   permissions: z.array(z.string()).optional(),
 });
 
+export const updateOwnPasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "A senha atual é obrigatória"),
+    password: strongPasswordSchema,
+    password_confirmation: z.string().min(1, "Confirme a nova senha"),
+  })
+  .refine((data) => data.password !== data.current_password, {
+    message: "A nova senha deve ser diferente da senha atual",
+    path: ["password"],
+  })
+  .refine((data) => data.password === data.password_confirmation, {
+    message: "As senhas não coincidem",
+    path: ["password_confirmation"],
+  });
+
 export type UserCreateFormData = z.infer<typeof userCreateSchema>;
 export type UserUpdateFormData = z.infer<typeof userUpdateSchema>;
+export type UpdateOwnPasswordFormData = z.infer<typeof updateOwnPasswordSchema>;

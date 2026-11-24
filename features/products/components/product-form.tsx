@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormFieldError } from "@/components/common/form-field-error";
-import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
 import {
   productSchema,
   productUnits,
@@ -485,52 +484,35 @@ export function ProductForm({ initialData }: ProductFormProps) {
           <Label htmlFor="brand_id" className="text-sm font-medium">
             Marca do Produto
           </Label>
-          <div className="flex items-center gap-1.5">
-            <Controller
-              control={control}
-              name="brand_id"
-              render={({ field }) => (
-                <Select
-                  value={field.value || "none"}
-                  onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
-                  disabled={isLoadingBrands || isSubmitting}
-                >
-                  <SelectTrigger id="brand_id" className="flex-1 min-w-0">
-                    <SelectValue placeholder="Selecione uma marca..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhuma marca vinculada</SelectItem>
-                    {brands.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        #{b.number} - {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            <ResourceCreateShortcut
-              href="/brands/new"
-              label="Cadastrar nova marca"
-              permission="brand.create"
-              disabled={isSubmitting}
-            />
-          </div>
+          <Controller
+            control={control}
+            name="brand_id"
+            render={({ field }) => (
+              <Select
+                value={field.value || "none"}
+                onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                disabled={isLoadingBrands || isSubmitting}
+              >
+                <SelectTrigger id="brand_id">
+                  <SelectValue placeholder="Selecione uma marca..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma marca vinculada</SelectItem>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      #{b.number} - {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
           <FormFieldError error={errors.brand_id} />
         </div>
 
         {/* Categorias */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium">Categorias</Label>
-            <ResourceCreateShortcut
-              href="/categories/new"
-              label="Cadastrar nova categoria"
-              permission="category.create"
-              compact
-              disabled={isSubmitting}
-            />
-          </div>
+          <Label className="text-sm font-medium">Categorias</Label>
           {categories.length === 0 ? (
             <p className="text-xs text-muted-foreground py-2 italic">
               Nenhuma categoria cadastrada.

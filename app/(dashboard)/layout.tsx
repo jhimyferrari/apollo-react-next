@@ -1,65 +1,29 @@
-"use client";
+import React from "react";
+import { redirect } from "next/navigation";
+import { AuthProvider } from "@/components/providers/auth-provider";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { fetchServerSession } from "@/lib/bff/session";
 
-import React, { useEffect, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
-import { getToken, subscribeAuthChange } from "@/lib/auth/token";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
-import { Loader2 } from "lucide-react";
+export const dynamic = "force-dynamic";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const isHydrated = useSyncExternalStore(
-    subscribeAuthChange,
-    () => true,
-    () => false
-  );
-  const token = useSyncExternalStore(
-    subscribeAuthChange,
-    getToken,
-    () => undefined
-  );
-  const isAuthenticated = isHydrated ? Boolean(token) : null;
+  const session = await fetchServerSession();
 
-  useEffect(() => {
-    if (isAuthenticated === false) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, router]);
-
-  if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-          <span className="text-sm font-medium text-muted-foreground">
-            Verificando credenciais do Apollo System...
-          </span>
-        </div>
-      </div>
-    );
+  if (session.invalidToken) {
+    redirect("/api/auth/clear-session");
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (!session.authenticated || !session.user) {
+    redirect("/login");
   }
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
-      {/* Sidebar Desktop */}
-      <Sidebar className="hidden md:flex" />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
+    <AuthProvider initialUser={session.user} autoFetch={true}>
+      <DashboardShell>{children}</DashboardShell>
+    </AuthProvider>
   );
 }

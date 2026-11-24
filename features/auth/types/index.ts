@@ -7,13 +7,17 @@ export interface LoginCredentials {
 }
 
 export interface LoginResponseData {
-  token: string;
   user: SessionUser | null;
 }
 
 export interface LoginResponse {
   message: number | string;
   data: LoginResponseData;
+}
+
+export interface AuthSessionResponse {
+  authenticated: boolean;
+  user: SessionUser | null;
 }
 
 export interface Organization {

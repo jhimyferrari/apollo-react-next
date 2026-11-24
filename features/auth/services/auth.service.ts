@@ -1,8 +1,7 @@
 import { apiClient } from "@/lib/api/client";
-import { setToken, removeToken } from "@/lib/auth/token";
-import { setUserSession, clearSession } from "@/lib/auth/session";
 import { cleanDocument } from "@/lib/masks";
 import type {
+  AuthSessionResponse,
   LoginCredentials,
   LoginResponse,
   RegisterOrganizationData,
@@ -11,8 +10,8 @@ import type {
 
 export const authService = {
   /**
-   * Realiza login no sistema (multi-tenant)
-   * POST /v1/login { email, password, organization_document }
+   * Realiza login no sistema (multi-tenant) via BFF.
+   * POST /api/v1/login { email, password, organization_document }
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     const payload = {
@@ -21,21 +20,20 @@ export const authService = {
       organization_document: cleanDocument(credentials.organization_document),
     };
 
-    const response = await apiClient.post<LoginResponse>("/v1/login", payload);
+    return apiClient.post<LoginResponse>("/v1/login", payload);
+  },
 
-    if (response?.data?.token) {
-      setToken(response.data.token);
-      if (response.data.user) {
-        setUserSession(response.data.user);
-      }
-    }
-
-    return response;
+  /**
+   * Consulta a sessão autenticada atual via BFF.
+   * GET /api/auth/session
+   */
+  async getSession(): Promise<AuthSessionResponse> {
+    return apiClient.get<AuthSessionResponse>("/auth/session");
   },
 
   /**
    * Registra uma nova organização (empresa)
-   * POST /v1/organizations { name, document, email, password }
+   * POST /api/v1/organizations { name, document, email, password }
    */
   async registerOrganization(
     data: RegisterOrganizationData
@@ -54,17 +52,13 @@ export const authService = {
   },
 
   /**
-   * Encerra a sessão do usuário.
-   * Executa POST /v1/logout e limpa determinísticamente o token no cliente.
+   * Encerra a sessão do usuário via BFF (revoga no Laravel e limpa o cookie HttpOnly).
    */
   async logout(): Promise<void> {
     try {
       await apiClient.post("/v1/logout");
     } catch {
-      // Falha na requisição de logout no servidor não impede a limpeza no cliente
-    } finally {
-      clearSession();
-      removeToken();
+      // Falha na requisição de logout não impede a limpeza do estado local
     }
   },
 };

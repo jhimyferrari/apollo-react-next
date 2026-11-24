@@ -26,8 +26,12 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
-import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
-import { formatDate, formatDateTime, formatQuantity } from "@/lib/formatters";
+import {
+  extractMoneyAmount,
+  formatDate,
+  formatDateTime,
+  formatQuantity,
+} from "@/lib/formatters";
 import { parseApiError, getFirstValidationMessage } from "@/lib/api/errors";
 import { maskDocument, maskPhone, maskStock } from "@/lib/masks";
 import {
@@ -142,7 +146,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
         originalNumber: it.number,
         product_id: it.product_id,
         quantity: maskStock(String(it.quantity)),
-        unit_price: String(it.unit_price || "0"),
+        unit_price: extractMoneyAmount(it.unit_price, "0"),
       }))
     );
     setIsEditingDraft(true);
@@ -458,59 +462,43 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Cliente</Label>
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={editClientId}
-                    onValueChange={setEditClientId}
-                    disabled={isActionPending}
-                  >
-                    <SelectTrigger className="flex-1 min-w-0">
-                      <SelectValue placeholder="Selecione o cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          #{c.number} - {c.name}
-                          {c.document ? ` (${maskDocument(c.document)})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <ResourceCreateShortcut
-                    href="/clients/new"
-                    label="Cadastrar novo cliente"
-                    permission="client.create"
-                    disabled={isActionPending}
-                  />
-                </div>
+                <Select
+                  value={editClientId}
+                  onValueChange={setEditClientId}
+                  disabled={isActionPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.number} - {c.name}
+                        {c.document ? ` (${maskDocument(c.document)})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Vendedor</Label>
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={editSellerId}
-                    onValueChange={setEditSellerId}
-                    disabled={isActionPending}
-                  >
-                    <SelectTrigger className="flex-1 min-w-0">
-                      <SelectValue placeholder="Selecione o vendedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sellers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          #{s.number} - {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <ResourceCreateShortcut
-                    href="/sellers/new"
-                    label="Cadastrar novo vendedor"
-                    permission="seller.create"
-                    disabled={isActionPending}
-                  />
-                </div>
+                <Select
+                  value={editSellerId}
+                  onValueChange={setEditSellerId}
+                  disabled={isActionPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o vendedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sellers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        #{s.number} - {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -542,7 +530,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                     <div className="md:col-span-1 font-mono text-xs text-muted-foreground">
                       #{idx + 1}
                     </div>
-                    <div className="md:col-span-6 flex items-center gap-1.5">
+                    <div className="md:col-span-6">
                       <Select
                         value={item.product_id}
                         onValueChange={(val) =>
@@ -550,7 +538,7 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                         }
                         disabled={isActionPending}
                       >
-                        <SelectTrigger className="flex-1 min-w-0">
+                        <SelectTrigger>
                           <SelectValue placeholder="Selecione um produto..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -561,12 +549,6 @@ export function SalesOrderDetails({ order }: SalesOrderDetailsProps) {
                           ))}
                         </SelectContent>
                       </Select>
-                      <ResourceCreateShortcut
-                        href="/products/new"
-                        label="Cadastrar novo produto"
-                        permission="product.create"
-                        disabled={isActionPending}
-                      />
                     </div>
                     <div className="md:col-span-2">
                       <Input
