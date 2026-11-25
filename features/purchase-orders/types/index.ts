@@ -4,6 +4,7 @@ import type {
   OrderLifecycleStatus,
   OrderPaymentStatus,
 } from "@/lib/orders/payment-status";
+import type { MoneyLike } from "@/lib/formatters";
 
 export type OrderStatus = OrderLifecycleStatus;
 export type PaymentStatus = OrderPaymentStatus;
@@ -13,8 +14,8 @@ export interface PurchaseOrderItemResource {
   number: number;
   product_id: string;
   quantity: string | number;
-  unit_price: string;
-  subtotal: string;
+  unit_price: MoneyLike;
+  subtotal: MoneyLike;
   product?: ProductResource;
 }
 
@@ -24,7 +25,7 @@ export interface PurchaseOrderResource {
   status: OrderStatus;
   payment_status: PaymentStatus;
   supplier_id: string;
-  total: string;
+  total: MoneyLike;
   replaces_order_id: string | null;
   confirmed_at: string | null;
   cancelled_at: string | null;

@@ -1,11 +1,8 @@
-import { getToken } from "../auth/token";
-import { clearSession } from "../auth/session";
+import { broadcastAuthEvent } from "../auth/sync";
 import { parseApiError } from "./errors";
 import type { ParsedApiError } from "./types";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:8000/api";
+const BASE_URL = "/api";
 
 export class ApiClientError extends Error {
   public status: number;
@@ -37,43 +34,44 @@ class HttpClient {
     params?: Record<string, string | number | boolean | undefined | null>
   ): string {
     const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-    const url = new URL(`${this.baseUrl}${cleanEndpoint}`);
+    const path = `${this.baseUrl}${cleanEndpoint}`;
 
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          url.searchParams.append(key, String(value));
-        }
-      });
+    if (!params) {
+      return path;
     }
 
-    return url.toString();
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        searchParams.append(key, String(value));
+      }
+    });
+
+    const query = searchParams.toString();
+    return query ? `${path}?${query}` : path;
   }
 
   /**
-   * Executa a requisição HTTP aplicando interceptors de autenticação e erro.
+   * Executa a requisição HTTP same-origin para o BFF Next.js.
    */
   public async request<T>(
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<T> {
     const { params, headers: customHeaders, ...customOptions } = options;
-    const url = this.buildUrl(endpoint, params);
+    const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = this.buildUrl(cleanEndpoint, params);
 
     const headers: Record<string, string> = {
       Accept: "application/json",
       "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
       ...(customHeaders as Record<string, string>),
     };
 
-    // Interceptor de Requisição: Injeta Token Bearer se autenticado
-    const token = getToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
     const response = await fetch(url, {
       ...customOptions,
+      credentials: "same-origin",
       headers,
     });
 
@@ -101,10 +99,17 @@ class HttpClient {
         data: responseData,
       });
 
-      // Se desautenticado (401), limpa credenciais e redireciona ao login
-      if (parsed.isUnauthenticated) {
-        clearSession();
-        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      const shouldIgnoreUnauthenticated =
+        cleanEndpoint === "/v1/login" || cleanEndpoint === "/auth/session";
+
+      // Se desautenticado (401), notifica outras abas e redireciona ao login
+      if (parsed.isUnauthenticated && !shouldIgnoreUnauthenticated) {
+        broadcastAuthEvent("logout");
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/login") &&
+          !window.location.pathname.startsWith("/register-organization")
+        ) {
           window.location.replace("/login");
         }
       }

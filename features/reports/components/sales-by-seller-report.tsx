@@ -24,7 +24,7 @@ import {
 import { DataTablePagination } from "@/components/common/data-table-pagination";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
-import { formatBRL } from "@/lib/formatters";
+import { extractMoneyAmount, formatBRL } from "@/lib/formatters";
 import { maskDocument } from "@/lib/masks";
 import { useSalesBySellerReport } from "../hooks/use-reports";
 import { ReportFilterBar } from "./report-filter-bar";
@@ -59,7 +59,7 @@ export function SalesBySellerReportView() {
 
   const rows = data?.data ?? [];
   const totals = data?.totals;
-  const globalTotalAmount = Number(totals?.total_amount ?? 0);
+  const globalTotalAmount = Number(extractMoneyAmount(totals?.total_amount, "0"));
 
   const avgRevenuePerSeller =
     totals && totals.active_sellers_count > 0
@@ -101,7 +101,7 @@ export function SalesBySellerReportView() {
       <ReportNav />
 
       <ReportFilterBar
-        fields={["period", "date_field", "status", "seller"]}
+        fields={["period", "date_field", "status", "payment_status", "seller"]}
         value={filters}
         onApply={setFilters}
         orderOptions={ORDER_OPTIONS}
@@ -119,7 +119,7 @@ export function SalesBySellerReportView() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
                 title="Faturamento Comercial"
-                value={totals.total_amount_formatted}
+                value={formatBRL(totals.total_amount)}
                 hint="Soma consolidada das vendas por vendedor"
                 icon={DollarSign}
                 accent="emerald"
@@ -254,10 +254,10 @@ export function SalesBySellerReportView() {
                             {row.orders_count}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground">
-                            {row.average_ticket_formatted}
+                            {formatBRL(row.average_ticket)}
                           </TableCell>
                           <TableCell className="text-right font-semibold tabular-nums text-foreground">
-                            {row.total_amount_formatted}
+                            {formatBRL(row.total_amount)}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">

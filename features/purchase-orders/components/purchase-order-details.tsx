@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -17,17 +17,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { MoneyDisplay } from "@/components/common/money-display";
-import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
-import { formatDate, formatDateTime, formatQuantity } from "@/lib/formatters";
+import {
+  extractMoneyAmount,
+  formatDate,
+  formatDateTime,
+  formatQuantity,
+  type MoneyLike,
+} from "@/lib/formatters";
 import { parseApiError, getFirstValidationMessage } from "@/lib/api/errors";
 import { maskDocument, maskPhone, maskStock } from "@/lib/masks";
 import {
@@ -46,7 +44,13 @@ import {
   useSupplierLookup,
   useProductLookup,
 } from "@/features/lookups/hooks/use-lookups";
-import { extractLookupAmount } from "@/features/lookups/types";
+import { LookupCodeSelect } from "@/features/lookups/components/lookup-code-select";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import {
+  extractLookupAmount,
+  type ProductLookupResource,
+  type SupplierLookupResource,
+} from "@/features/lookups/types";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import type {
   PurchaseOrderResource,
@@ -75,6 +79,7 @@ interface PurchaseOrderDetailsProps {
 }
 
 interface EditableOrderItem {
+  rowKey: string;
   originalId?: string;
   originalProductId?: string;
   originalQuantity?: number;
@@ -86,6 +91,7 @@ interface EditableOrderItem {
 
 export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
   const router = useRouter();
+  const nextRowIdRef = useRef(0);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -112,6 +118,39 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
   const suppliers = suppliersData?.data || [];
   const products = productsData?.data || [];
 
+  const supplierFallback = useMemo<SupplierLookupResource | null>(() => {
+    if (!order.supplier) return null;
+    return {
+      id: order.supplier.id,
+      number: order.supplier.number,
+      name: order.supplier.trade_name || order.supplier.legal_name,
+      document: order.supplier.document,
+      status: order.supplier.status,
+    };
+  }, [order.supplier]);
+
+  const productFallbackById = useMemo(() => {
+    const map = new Map<string, ProductLookupResource>();
+    for (const it of order.items || []) {
+      if (it.product) {
+        map.set(it.product.id, {
+          id: it.product.id,
+          number: it.product.number,
+          name: it.product.name,
+          unit: it.product.unit,
+          sale_price: extractMoneyAmount(it.product.sale_price as MoneyLike, "0"),
+          cost_price: extractMoneyAmount(it.product.cost_price as MoneyLike, "0"),
+          stock_quantity: extractMoneyAmount(
+            it.product.stock_quantity as MoneyLike,
+            "0"
+          ),
+          status: it.product.status,
+        });
+      }
+    }
+    return map;
+  }, [order.items]);
+
   const paymentDisplay = getPaymentStatusDisplay(order.payment_status);
   const paymentAction = getAvailablePaymentAction(
     order.status,
@@ -131,20 +170,25 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
     setRemovedItemIds([]);
     setEditItems(
       (order.items || []).map((it) => ({
+        rowKey: it.id,
         originalId: it.id,
         originalProductId: it.product_id,
         originalQuantity: Number(String(it.quantity).replace(",", ".")),
         originalNumber: it.number,
         product_id: it.product_id,
         quantity: maskStock(String(it.quantity)),
-        unit_price: String(it.unit_price || "0"),
+        unit_price: extractMoneyAmount(it.unit_price, "0"),
       }))
     );
     setIsEditingDraft(true);
   };
 
-  const handleEditProductChange = (index: number, productId: string) => {
-    const prod = products.find((p) => p.id === productId);
+  const handleEditProductChange = (
+    index: number,
+    productId: string,
+    resolvedProduct?: ProductLookupResource
+  ) => {
+    const prod = resolvedProduct ?? products.find((p) => p.id === productId);
     const priceStr = prod ? extractLookupAmount(prod.cost_price, "0") : "0";
 
     setEditItems((prev) =>
@@ -166,9 +210,10 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
   };
 
   const handleAddEditItem = () => {
+    const rowKey = `new-${++nextRowIdRef.current}`;
     setEditItems((prev) => [
       ...prev,
-      { product_id: "", quantity: "1", unit_price: "0" },
+      { rowKey, product_id: "", quantity: "1", unit_price: "0" },
     ]);
   };
 
@@ -302,7 +347,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
     string,
     { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
   > = {
-    draf: { label: "Rascunho", variant: "secondary" },
+    draft: { label: "Rascunho", variant: "secondary" },
     confirmed: { label: "Confirmado", variant: "default" },
     cancelled: { label: "Cancelado", variant: "destructive" },
   };
@@ -351,7 +396,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
         {/* Botões do Ciclo de Vida */}
         {(canEdit || canDelete) && (
           <div className="flex flex-wrap items-center gap-2">
-            {canEdit && order.status === "draf" && !isEditingDraft && (
+            {canEdit && order.status === "draft" && !isEditingDraft && (
               <>
                 <Button
                   size="sm"
@@ -412,7 +457,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
               </Button>
             )}
 
-            {canDelete && order.status === "draf" && !isEditingDraft && (
+            {canDelete && order.status === "draft" && !isEditingDraft && (
               <Button
                 size="sm"
                 variant="outline"
@@ -429,7 +474,7 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
       </div>
 
       {/* Painel de Edição do Rascunho */}
-      {isEditingDraft && order.status === "draf" && (
+      {isEditingDraft && order.status === "draft" && (
         <Card className="border-primary/40 bg-card shadow-md">
           <CardHeader className="p-4 border-b border-border flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -450,31 +495,19 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Fornecedor</Label>
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={editSupplierId}
-                    onValueChange={setEditSupplierId}
-                    disabled={isActionPending}
-                  >
-                    <SelectTrigger className="flex-1 min-w-0">
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          #{s.number} - {s.name}
-                          {s.document ? ` (${maskDocument(s.document)})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <ResourceCreateShortcut
-                    href="/suppliers/new"
-                    label="Cadastrar novo fornecedor"
-                    permission="supplier.create"
-                    disabled={isActionPending}
-                  />
-                </div>
+                <LookupCodeSelect<SupplierLookupResource>
+                  value={editSupplierId}
+                  onValueChange={(val) => setEditSupplierId(val)}
+                  options={suppliers}
+                  selectedFallback={supplierFallback}
+                  lookupByNumber={(num) => lookupService.supplierByNumber(num)}
+                  renderOptionLabel={(s) =>
+                    `${s.number} - ${s.name}${s.document ? ` (${maskDocument(s.document)})` : ""}`
+                  }
+                  placeholder="Selecione o fornecedor"
+                  resourceLabel="Fornecedor"
+                  disabled={isActionPending}
+                />
               </div>
             </div>
 
@@ -500,35 +533,26 @@ export function PurchaseOrderDetails({ order }: PurchaseOrderDetailsProps) {
                 const price = Number(item.unit_price.replace(",", ".") || 0);
                 return (
                   <div
-                    key={item.originalId || `new-${idx}`}
+                    key={item.rowKey}
                     className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-3 rounded-md border border-border bg-muted/15"
                   >
                     <div className="md:col-span-1 font-mono text-xs text-muted-foreground">
                       #{idx + 1}
                     </div>
-                    <div className="md:col-span-6 flex items-center gap-1.5">
-                      <Select
+                    <div className="md:col-span-6">
+                      <LookupCodeSelect<ProductLookupResource>
                         value={item.product_id}
-                        onValueChange={(val) =>
-                          handleEditProductChange(idx, val)
+                        onValueChange={(val, resolved) =>
+                          handleEditProductChange(idx, val, resolved)
                         }
-                        disabled={isActionPending}
-                      >
-                        <SelectTrigger className="flex-1 min-w-0">
-                          <SelectValue placeholder="Selecione um produto..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              #{p.number} - {p.name} ({p.unit.toUpperCase()})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <ResourceCreateShortcut
-                        href="/products/new"
-                        label="Cadastrar novo produto"
-                        permission="product.create"
+                        options={products}
+                        selectedFallback={productFallbackById.get(item.product_id) ?? null}
+                        lookupByNumber={(num) => lookupService.productByNumber(num)}
+                        renderOptionLabel={(p) =>
+                          `${p.number} - ${p.name} (${p.unit.toUpperCase()})`
+                        }
+                        placeholder="Selecione um produto..."
+                        resourceLabel="Produto"
                         disabled={isActionPending}
                       />
                     </div>

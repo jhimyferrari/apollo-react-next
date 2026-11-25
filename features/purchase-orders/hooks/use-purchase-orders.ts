@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { purchaseOrderService } from "../services/purchase-order.service";
+import { purchaseOrderService, type PurchaseOrderListParams } from "../services/purchase-order.service";
 import { parseApiError } from "@/lib/api/errors";
 import type {
   PaymentStatus,
@@ -10,10 +10,11 @@ import type {
   UpdatePurchaseOrderRequest,
 } from "../types";
 
-export function usePurchaseOrders(page = 1, status?: string) {
+export function usePurchaseOrders(params?: PurchaseOrderListParams) {
   return useQuery({
-    queryKey: ["purchase-orders", page, status],
-    queryFn: () => purchaseOrderService.list({ page, status }),
+    queryKey: ["purchase-orders", params ?? {}],
+    queryFn: () => purchaseOrderService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -33,6 +34,7 @@ export function useCreatePurchaseOrder() {
       purchaseOrderService.create(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido de compra criado com sucesso!");
     },
     onError: (err) => {
@@ -57,6 +59,7 @@ export function useUpdatePurchaseOrder() {
     }) => purchaseOrderService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Pedido de compra atualizado!");
     },
     onError: (err) => {
@@ -76,6 +79,7 @@ export function useConfirmPurchaseOrder() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido de compra confirmado! Estoque atualizado.");
     },
     onError: (err) => {
@@ -97,6 +101,7 @@ export function useReopenPurchaseOrder() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido de compra reaberto!");
 
       const outdated = res?.data?.outdated_prices;
@@ -123,6 +128,7 @@ export function useCancelPurchaseOrder() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido de compra cancelado!");
     },
     onError: (err) => {
@@ -164,6 +170,7 @@ export function useDeletePurchaseOrder() {
     mutationFn: (id: string) => purchaseOrderService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Pedido de compra excluído!");
     },
     onError: (err) => {

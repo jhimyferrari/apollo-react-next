@@ -28,7 +28,11 @@ export function PermissionGuard({
   children,
   fallback,
 }: PermissionGuardProps) {
-  const { can } = usePermissions();
+  const { can, isInitialized } = usePermissions();
+
+  if (!isInitialized) {
+    return null;
+  }
 
   if (!can(permission, mode)) {
     if (fallback) return <>{fallback}</>;

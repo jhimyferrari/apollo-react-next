@@ -8,6 +8,7 @@ export const productSchema = z.object({
   status: z.enum(productStatuses).optional(),
   name: z
     .string()
+    .trim()
     .min(1, "O nome do produto é obrigatório")
     .max(45, "O nome pode ter no máximo 45 caracteres"),
   description: z.string().optional().nullable(),

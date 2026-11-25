@@ -10,18 +10,19 @@ import { useSeller } from "@/features/sellers/hooks/use-sellers";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function EditSellerPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const { data, isLoading, isError, error, refetch } = useSeller(id);
+function EditSellerContent({ id }: { id: string }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchedAfterMount,
+    isError,
+    error,
+    refetch,
+  } = useSeller(id);
   const seller = data?.data;
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !isFetchedAfterMount)) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -62,21 +63,35 @@ export default function EditSellerPage({
   }
 
   return (
-    <PermissionGuard
-      permission="seller.update"
-      title="Edição Não Permitida"
-      description="Você não possui permissão para editar os dados deste vendedor."
-    >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Editar: ${seller.legal_name}`}
-          description={`Código #${seller.number} • ${seller.trade_name}`}
-        />
+    <div className="space-y-6">
+      <PageHeader
+        title={`Editar: ${seller.legal_name}`}
+        description={`Código #${seller.number} • ${seller.trade_name}`}
+      />
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-          <SellerForm initialData={seller} />
-        </div>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+        <SellerForm initialData={seller} />
       </div>
+    </div>
+  );
+}
+
+export default function EditSellerPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
+    <PermissionGuard
+      permission={["seller.view", "seller.update"]}
+      mode="all"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para visualizar ou editar os dados deste vendedor."
+    >
+      <EditSellerContent id={id} />
     </PermissionGuard>
   );
 }

@@ -30,6 +30,7 @@ import {
   X,
   BookOpen,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { FormFieldError } from "@/components/common/form-field-error";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { ChangeOwnPasswordDialog } from "./change-own-password-dialog";
 import {
   permissionDomainGroups,
   availablePermissions,
@@ -112,6 +115,8 @@ function extractPermissionsError(fields: Record<string, string[]>): string | nul
 export function UserForm({ initialData }: UserFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialData);
+  const { user: currentUser } = useAuth();
+  const canUpdateOwnPassword = Boolean(currentUser);
 
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
@@ -125,6 +130,8 @@ export function UserForm({ initialData }: UserFormProps) {
     initialPermissionNames
   );
   const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showOwnPasswordDialog, setShowOwnPasswordDialog] = useState(false);
   const [permissionsError, setPermissionsError] = useState<string | null>(null);
 
   // Administradores têm acesso total e suas permissões não podem ser modificadas.
@@ -132,6 +139,10 @@ export function UserForm({ initialData }: UserFormProps) {
   const isAdminTarget =
     Boolean(initialData?.is_administrator) ||
     Boolean(initialData?.permissions?.some((p) => p.name.startsWith("user.")));
+  const isSelfTarget = Boolean(
+    currentUser?.id && initialData?.id === currentUser.id
+  );
+  const isReadOnlyTarget = isSelfTarget || isAdminTarget;
 
   const createForm = useForm<UserCreateFormData>({
     resolver: zodResolver(userCreateSchema),
@@ -148,6 +159,7 @@ export function UserForm({ initialData }: UserFormProps) {
     defaultValues: {
       name: initialData?.name || "",
       email: initialData?.email || "",
+      password: "",
       permissions: initialPermissionNames,
     },
   });
@@ -220,7 +232,7 @@ export function UserForm({ initialData }: UserFormProps) {
   };
 
   const handleUpdateSubmit = async (formData: UserUpdateFormData) => {
-    if (!initialData) return;
+    if (!initialData || isReadOnlyTarget) return;
     setPermissionsError(null);
 
     const trimmedName = formData.name.trim();
@@ -232,6 +244,9 @@ export function UserForm({ initialData }: UserFormProps) {
     }
     if (trimmedEmail !== initialData.email) {
       payload.email = trimmedEmail;
+    }
+    if (formData.password && formData.password.length > 0) {
+      payload.password = formData.password;
     }
 
     if (!isAdminTarget) {
@@ -262,7 +277,7 @@ export function UserForm({ initialData }: UserFormProps) {
       const parsed = parseApiError(err);
       if (parsed.isValidationError) {
         applyApiValidationErrors(parsed, updateForm.setError, {
-          knownFields: ["name", "email", "permissions"],
+          knownFields: ["name", "email", "password", "permissions"],
         });
         setPermissionsError(extractPermissionsError(parsed.fields));
       }
@@ -278,6 +293,22 @@ export function UserForm({ initialData }: UserFormProps) {
           className="space-y-6"
           noValidate
         >
+          {isSelfTarget && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-semibold text-foreground">
+                  Perfil do usuário autenticado
+                </p>
+                <p className="text-muted-foreground mt-0.5">
+                  Você não pode editar seus próprios dados cadastrais ou permissões por
+                  esta tela. Utilize o botão &quot;Alterar Minha Senha&quot; para atualizar
+                  sua senha atual.
+                </p>
+              </div>
+            </div>
+          )}
+
           <Card className="border border-border">
             <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -300,7 +331,7 @@ export function UserForm({ initialData }: UserFormProps) {
                     placeholder="Ex.: Mariana Silva"
                     className="pl-9"
                     {...updateForm.register("name")}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isReadOnlyTarget}
                   />
                 </div>
                 <FormFieldError error={updateForm.formState.errors.name} />
@@ -318,15 +349,56 @@ export function UserForm({ initialData }: UserFormProps) {
                     placeholder="operador@empresa.com.br"
                     className="pl-9"
                     {...updateForm.register("email")}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isReadOnlyTarget}
                   />
                 </div>
                 <FormFieldError error={updateForm.formState.errors.email} />
               </div>
+
+              {!isReadOnlyTarget && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-password" className="text-sm font-medium">
+                    Nova Senha{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      (opcional — deixe em branco para manter a atual)
+                    </span>
+                  </Label>
+                  <div className="relative max-w-md">
+                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="edit-password"
+                      type={showEditPassword ? "text" : "password"}
+                      placeholder="Mín. 8 caracteres, maiúscula, minúscula, número e símbolo"
+                      className="pl-9 pr-10"
+                      {...updateForm.register("password")}
+                      disabled={isSubmitting}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowEditPassword((prev) => !prev)}
+                      tabIndex={-1}
+                      title={showEditPassword ? "Ocultar senha" : "Ver senha"}
+                    >
+                      {showEditPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Ao definir uma nova senha, todas as sessões ativas deste usuário serão
+                    revogadas.
+                  </p>
+                  <FormFieldError error={updateForm.formState.errors.password} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {isAdminTarget ? (
+          {isSelfTarget ? null : isAdminTarget ? (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 flex items-start gap-3">
               <ShieldCheck className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div>
@@ -334,8 +406,9 @@ export function UserForm({ initialData }: UserFormProps) {
                   Usuário Administrador
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Administradores possuem acesso total ao sistema e suas permissões não
-                  podem ser modificadas. Apenas nome e e-mail podem ser atualizados.
+                  Administradores possuem acesso total ao sistema e não podem ter
+                  seus dados ou permissões alterados por outros usuários (apenas
+                  o próprio administrador pode alterar sua senha).
                 </p>
               </div>
             </div>
@@ -363,20 +436,39 @@ export function UserForm({ initialData }: UserFormProps) {
               </Link>
             </Button>
 
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando Alterações...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Salvar Alterações
-                </>
-              )}
-            </Button>
+            {isSelfTarget ? (
+              canUpdateOwnPassword && (
+                <Button
+                  type="button"
+                  onClick={() => setShowOwnPasswordDialog(true)}
+                >
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  Alterar Minha Senha
+                </Button>
+              )
+            ) : isAdminTarget ? null : (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando Alterações...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Salvar Alterações
+                  </>
+                )}
+              </Button>
+            )}
           </div>
+
+          {isSelfTarget && (
+            <ChangeOwnPasswordDialog
+              open={showOwnPasswordDialog}
+              onOpenChange={setShowOwnPasswordDialog}
+            />
+          )}
         </form>
       ) : (
         /* Modo Criação de Novo Usuário */

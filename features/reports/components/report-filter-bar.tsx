@@ -44,9 +44,10 @@ interface ReportFilterBarProps {
 const ALL = "__all__";
 
 const STATUS_OPTIONS = [
-  { value: "confirmed", label: "Confirmados (padrão)" },
-  { value: "draf", label: "Rascunhos" },
+  { value: "confirmed", label: "Confirmados" },
+  { value: "draft", label: "Rascunhos" },
   { value: "cancelled", label: "Cancelados" },
+  { value: "all", label: "Todos os status" },
 ];
 
 const PAYMENT_OPTIONS = [
@@ -59,6 +60,9 @@ const PAYMENT_OPTIONS = [
 const DATE_FIELD_OPTIONS = [
   { value: "confirmed_at", label: "Data de confirmação" },
   { value: "created_at", label: "Data de criação" },
+  { value: "paid_at", label: "Data de pagamento" },
+  { value: "refunded_at", label: "Data de estorno" },
+  { value: "cancelled_at", label: "Data de cancelamento" },
 ];
 
 const PER_PAGE_OPTIONS = [
@@ -299,6 +303,12 @@ export function ReportFilterBar({
   isFetching = false,
 }: ReportFilterBarProps) {
   const [draft, setDraft] = useState<ReportFilters>(value);
+  const [prevValue, setPrevValue] = useState<ReportFilters>(value);
+
+  if (prevValue !== value) {
+    setPrevValue(value);
+    setDraft(value);
+  }
 
   const set = <K extends keyof ReportFilters>(
     key: K,
@@ -432,7 +442,7 @@ export function ReportFilterBar({
             value={draft.status}
             onChange={(v) => set("status", v as ReportFilters["status"])}
             options={STATUS_OPTIONS}
-            allLabel="Confirmados (padrão)"
+            allLabel="Padrão (automático)"
           />
         )}
 

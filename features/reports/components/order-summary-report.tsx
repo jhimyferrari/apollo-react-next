@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   DollarSign,
   Eye,
   Layers,
@@ -22,7 +23,7 @@ import {
 import { DataTablePagination } from "@/components/common/data-table-pagination";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
-import { formatDate, formatQuantity } from "@/lib/formatters";
+import { formatBRL, formatDate, formatQuantity } from "@/lib/formatters";
 import {
   useSalesSummaryReport,
   usePurchasesSummaryReport,
@@ -57,6 +58,7 @@ interface SummaryViewProps {
   errorMessage?: string;
   refetch: () => void;
   onResetFilters: () => void;
+  onFilterPendingRefund?: () => void;
   totals?: OrderSummaryTotals;
   rows: (SalesSummaryRow | PurchaseSummaryRow)[];
   meta?: ReportPaginationMeta;
@@ -75,6 +77,7 @@ function SummaryView({
   errorMessage,
   refetch,
   onResetFilters,
+  onFilterPendingRefund,
   totals,
   rows,
   meta,
@@ -108,7 +111,7 @@ function SummaryView({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title={isSales ? "Faturamento no Período" : "Volume Comprado no Período"}
-              value={totals.total_amount_formatted}
+              value={formatBRL(totals.total_amount)}
               hint={`Baseado em ${totals.orders_count} ${
                 totals.orders_count === 1 ? "pedido filtrado" : "pedidos filtrados"
               }`}
@@ -128,7 +131,7 @@ function SummaryView({
             />
             <StatCard
               title="Ticket Médio por Pedido"
-              value={totals.average_ticket_formatted}
+              value={formatBRL(totals.average_ticket)}
               hint="Valor médio por operação"
               icon={TrendingUp}
               accent="sky"
@@ -142,20 +145,52 @@ function SummaryView({
             />
           </div>
 
+          {totals.pending_refund && totals.pending_refund.count > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                <div className="text-xs text-foreground">
+                  <span className="font-semibold">
+                    {totals.pending_refund.count}{" "}
+                    {totals.pending_refund.count === 1
+                      ? "pedido cancelado aguarda estorno"
+                      : "pedidos cancelados aguardam estorno"}
+                  </span>{" "}
+                  no período/parceiro selecionado (total:{" "}
+                  <span className="font-semibold tabular-nums">
+                    {formatBRL(totals.pending_refund.total)}
+                  </span>
+                  ).
+                </div>
+              </div>
+              {onFilterPendingRefund && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onFilterPendingRefund}
+                  className="shrink-0 h-8 text-xs border-amber-500/40 bg-background hover:bg-amber-500/10"
+                >
+                  Filtrar estornos pendentes
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             <BreakdownCard
               title="Distribuição por Status do Pedido"
               subtitle="Panorama geral no período e parceiro selecionados"
               entries={totals.by_status}
               labels={STATUS_LABELS}
-              expectedKeys={["confirmed", "draf", "cancelled"]}
+              expectedKeys={["confirmed", "draft", "cancelled"]}
             />
             <BreakdownCard
               title="Distribuição por Status de Pagamento"
-              subtitle="Proporção financeira entre pedidos pagos e pendentes"
+              subtitle="Proporção financeira por situação de pagamento"
               entries={totals.by_payment_status}
               labels={PAYMENT_LABELS}
-              expectedKeys={["paid", "pending"]}
+              expectedKeys={["paid", "pending", "refunded", "cancelled"]}
             />
           </div>
         </>
@@ -266,13 +301,27 @@ function SummaryView({
                         {row.items_count}
                       </TableCell>
                       <TableCell className="text-right font-semibold tabular-nums text-foreground">
-                        {row.total_formatted}
+                        {formatBRL(row.total)}
                       </TableCell>
                       <TableCell className="text-center">
                         <StatusBadge status={row.status} />
+                        {row.cancelled_at && (
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatDate(row.cancelled_at)}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <PaymentBadge status={row.payment_status} />
+                        {row.refunded_at ? (
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            Estornado em {formatDate(row.refunded_at)}
+                          </div>
+                        ) : row.paid_at ? (
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            Pago em {formatDate(row.paid_at)}
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatDate(row.confirmed_at)}
@@ -343,6 +392,15 @@ export function SalesSummaryReportView() {
         errorMessage={q.error?.message}
         refetch={() => q.refetch()}
         onResetFilters={() => setFilters(DEFAULT_FILTERS)}
+        onFilterPendingRefund={() =>
+          setFilters((f) => ({
+            ...f,
+            date_field: f.date_field ?? "cancelled_at",
+            status: "cancelled",
+            payment_status: "paid",
+            page: 1,
+          }))
+        }
         totals={q.data?.totals}
         rows={q.data?.data ?? []}
         meta={q.data?.meta}
@@ -380,6 +438,15 @@ export function PurchasesSummaryReportView() {
         errorMessage={q.error?.message}
         refetch={() => q.refetch()}
         onResetFilters={() => setFilters(DEFAULT_FILTERS)}
+        onFilterPendingRefund={() =>
+          setFilters((f) => ({
+            ...f,
+            date_field: f.date_field ?? "cancelled_at",
+            status: "cancelled",
+            payment_status: "paid",
+            page: 1,
+          }))
+        }
         totals={q.data?.totals}
         rows={q.data?.data ?? []}
         meta={q.data?.meta}

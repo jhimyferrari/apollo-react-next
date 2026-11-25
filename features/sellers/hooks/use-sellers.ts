@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { sellerService } from "../services/seller.service";
+import { sellerService, type SellerListParams } from "../services/seller.service";
 import { parseApiError } from "@/lib/api/errors";
 import { useSellerLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreSellerRequest, UpdateSellerRequest } from "../types";
 
 export { useSellerLookup };
 
-export function useSellers(page = 1) {
+export function useSellers(params?: SellerListParams) {
   return useQuery({
-    queryKey: ["sellers", page],
-    queryFn: () => sellerService.list({ page }),
+    queryKey: ["sellers", params ?? {}],
+    queryFn: () => sellerService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -54,9 +55,15 @@ export function useUpdateSeller() {
       id: string;
       data: Partial<UpdateSellerRequest>;
     }) => sellerService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sellers"] });
-      queryClient.invalidateQueries({ queryKey: ["lookups", "sellers"] });
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["sellers", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sellers"] }),
+        queryClient.invalidateQueries({ queryKey: ["lookups", "sellers"] }),
+      ]);
       toast.success("Vendedor atualizado com sucesso!");
     },
     onError: (err) => {

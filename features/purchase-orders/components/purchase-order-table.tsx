@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTablePagination } from "@/components/common/data-table-pagination";
+import {
+  DataTableToolbar,
+  SortableTableHead,
+} from "@/components/common/data-table-toolbar";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
@@ -32,6 +36,7 @@ import {
   getPaymentStatusDisplay,
   type PaymentTransitionAction,
 } from "@/lib/orders/payment-status";
+import { toggleSortState, type SortState } from "@/lib/table-utils";
 import {
   usePurchaseOrders,
   useConfirmPurchaseOrder,
@@ -55,9 +60,45 @@ import {
 } from "lucide-react";
 import type { PurchaseOrderResource } from "../types";
 
+type PurchaseOrderSortKey =
+  | "number"
+  | "supplier"
+  | "total"
+  | "status"
+  | "payment_status"
+  | "created_at";
+
+const PURCHASE_ORDER_SORT_OPTIONS: Array<{
+  value: PurchaseOrderSortKey;
+  label: string;
+}> = [
+  { value: "number", label: "Código (#)" },
+  { value: "supplier", label: "Fornecedor" },
+  { value: "total", label: "Total (R$)" },
+  { value: "status", label: "Status" },
+  { value: "payment_status", label: "Pagamento" },
+  { value: "created_at", label: "Data" },
+];
+
 export function PurchaseOrderTable() {
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [sortState, setSortState] =
+    useState<SortState<PurchaseOrderSortKey> | null>(null);
+  const [appliedFilters, setAppliedFilters] = useState<{
+    search: string;
+    status: string;
+    paymentStatus: string;
+    sortState: SortState<PurchaseOrderSortKey> | null;
+  }>({
+    search: "",
+    status: "all",
+    paymentStatus: "all",
+    sortState: null,
+  });
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrderResource | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<PurchaseOrderResource | null>(null);
   const [paymentActionTarget, setPaymentActionTarget] = useState<{
@@ -72,19 +113,87 @@ export function PurchaseOrderTable() {
   const canDelete = can("purchase-order.delete");
   const hasActions = canView || canEdit || canDelete;
 
-  const { data, isLoading, isError, error, refetch } = usePurchaseOrders(page);
+  const { data, isLoading, isFetching, isError, error, refetch } = usePurchaseOrders({
+    page,
+    search: appliedFilters.search,
+    status: appliedFilters.status,
+    payment_status: appliedFilters.paymentStatus,
+    sort_by: appliedFilters.sortState?.key,
+    sort_direction: appliedFilters.sortState?.direction,
+  });
   const confirmMutation = useConfirmPurchaseOrder();
   const reopenMutation = useReopenPurchaseOrder();
   const cancelMutation = useCancelPurchaseOrder();
   const updatePaymentStatusMutation = useUpdatePurchaseOrderPaymentStatus();
   const deleteMutation = useDeletePurchaseOrder();
 
-  const orders = data?.data || [];
+  const orders = useMemo(() => data?.data || [], [data]);
   const meta = data?.meta;
+
+  const hasDraftFilters =
+    search.trim() !== "" ||
+    statusFilter !== "all" ||
+    paymentFilter !== "all" ||
+    sortState !== null;
+  const hasAppliedFilters =
+    appliedFilters.search.trim() !== "" ||
+    appliedFilters.status !== "all" ||
+    appliedFilters.paymentStatus !== "all" ||
+    appliedFilters.sortState !== null;
+  const hasActiveFilters = hasDraftFilters || hasAppliedFilters;
+
+  const handleApplyFilters = () => {
+    const isSame =
+      appliedFilters.search === search &&
+      appliedFilters.status === statusFilter &&
+      appliedFilters.paymentStatus === paymentFilter &&
+      appliedFilters.sortState?.key === sortState?.key &&
+      appliedFilters.sortState?.direction === sortState?.direction;
+
+    if (isSame && page === 1) {
+      void refetch();
+      return;
+    }
+
+    setAppliedFilters({
+      search,
+      status: statusFilter,
+      paymentStatus: paymentFilter,
+      sortState,
+    });
+    setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setPaymentFilter("all");
+    setSortState(null);
+    setAppliedFilters({
+      search: "",
+      status: "all",
+      paymentStatus: "all",
+      sortState: null,
+    });
+    setPage(1);
+  };
+
+  const handleHeaderSort = (key: string) => {
+    const nextSort = toggleSortState(
+      appliedFilters.sortState,
+      key as PurchaseOrderSortKey
+    );
+    setSortState(nextSort);
+    setAppliedFilters((prev) => ({ ...prev, sortState: nextSort }));
+    setPage(1);
+  };
 
   const handleConfirmOrder = async (id: string) => {
     try {
       await confirmMutation.mutateAsync(id);
+      if (orders.length === 1 && page > 1 && appliedFilters.status !== "all") {
+        setPage((p) => Math.max(1, p - 1));
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -106,6 +215,9 @@ export function PurchaseOrderTable() {
     try {
       await cancelMutation.mutateAsync({ id: orderToCancel.id });
       setOrderToCancel(null);
+      if (orders.length === 1 && page > 1 && appliedFilters.status !== "all") {
+        setPage((p) => Math.max(1, p - 1));
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -129,6 +241,9 @@ export function PurchaseOrderTable() {
     try {
       await deleteMutation.mutateAsync(orderToDelete.id);
       setOrderToDelete(null);
+      if (orders.length === 1 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -169,7 +284,7 @@ export function PurchaseOrderTable() {
     );
   }
 
-  if (orders.length === 0) {
+  if (orders.length === 0 && !hasAppliedFilters && page === 1 && (meta?.total ?? 0) === 0) {
     return (
       <EmptyState
         icon={ShoppingBag}
@@ -191,28 +306,156 @@ export function PurchaseOrderTable() {
 
   return (
     <div className="space-y-4">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por número ou fornecedor..."
+        filters={[
+          {
+            id: "status",
+            label: "Status",
+            value: statusFilter,
+            allLabel: "Todos os status",
+            options: [
+              { value: "draft", label: "Rascunho" },
+              { value: "confirmed", label: "Confirmado" },
+              { value: "cancelled", label: "Cancelado" },
+            ],
+            onChange: setStatusFilter,
+          },
+          {
+            id: "payment_status",
+            label: "Pagamento",
+            value: paymentFilter,
+            allLabel: "Todos os pagamentos",
+            options: [
+              { value: "pending", label: "Pendente" },
+              { value: "paid", label: "Pago" },
+              { value: "refunded", label: "Estornado" },
+              { value: "cancelled", label: "Cancelado" },
+            ],
+            onChange: setPaymentFilter,
+          },
+        ]}
+        sortOptions={PURCHASE_ORDER_SORT_OPTIONS}
+        sortState={sortState}
+        onSortKeyChange={(key) =>
+          setSortState(
+            key ? { key: key as PurchaseOrderSortKey, direction: sortState?.direction ?? "asc" } : null
+          )
+        }
+        onSortDirectionToggle={() =>
+          setSortState((prev) =>
+            prev
+              ? { ...prev, direction: prev.direction === "asc" ? "desc" : "asc" }
+              : null
+          )
+        }
+        onSubmit={handleApplyFilters}
+        onClearAll={clearAllFilters}
+        hasActiveFilters={hasActiveFilters}
+        isFetching={isFetching && !isLoading}
+        filteredCount={orders.length}
+        totalCount={meta?.total ?? orders.length}
+      />
+
       <div className="rounded-md border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">#</TableHead>
-              <TableHead>Fornecedor</TableHead>
-              <TableHead className="text-right">Total (R$)</TableHead>
-              <TableHead className="w-28 text-center">Status</TableHead>
-              <TableHead className="w-28 text-center">Pagamento</TableHead>
-              <TableHead className="w-28">Data</TableHead>
+              <SortableTableHead
+                label="#"
+                sortKey="number"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-16"
+              />
+              <SortableTableHead
+                label="Fornecedor"
+                sortKey="supplier"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+              />
+              <SortableTableHead
+                label="Total (R$)"
+                sortKey="total"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                align="right"
+              />
+              <SortableTableHead
+                label="Status"
+                sortKey="status"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                align="center"
+                className="w-28"
+              />
+              <SortableTableHead
+                label="Pagamento"
+                sortKey="payment_status"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                align="center"
+                className="w-28"
+              />
+              <SortableTableHead
+                label="Data"
+                sortKey="created_at"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-28"
+              />
               {hasActions && (
                 <TableHead className="w-16 text-center">Ações</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {orders.map((order) => {
+            {orders.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={hasActions ? 7 : 6}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  {page > 1 && meta && meta.total > 0 ? (
+                    <>
+                      <p>Nenhum registro nesta página.</p>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setPage(Math.max(1, meta.last_page))}
+                        className="mt-1"
+                      >
+                        Ir para a última página
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Nenhum pedido de compra encontrado com os filtros atuais.</p>
+                      {hasAppliedFilters && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          onClick={clearAllFilters}
+                          className="mt-1"
+                        >
+                          Limpar filtros
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              orders.map((order) => {
               const statusMap: Record<
                 string,
                 { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
               > = {
-                draf: { label: "Rascunho", variant: "secondary" },
+                draft: { label: "Rascunho", variant: "secondary" },
                 confirmed: { label: "Confirmado", variant: "default" },
                 cancelled: { label: "Cancelado", variant: "destructive" },
               };
@@ -290,7 +533,7 @@ export function PurchaseOrderTable() {
 
                           {canView && canEdit && <DropdownMenuSeparator />}
 
-                          {canEdit && order.status === "draf" && (
+                          {canEdit && order.status === "draft" && (
                             <DropdownMenuItem
                               className="cursor-pointer text-emerald-600 focus:text-emerald-600"
                               onClick={() => handleConfirmOrder(order.id)}
@@ -350,10 +593,10 @@ export function PurchaseOrderTable() {
 
                           {(canView || canEdit) &&
                             canDelete &&
-                            order.status === "draf" && (
+                            order.status === "draft" && (
                               <DropdownMenuSeparator />
                             )}
-                          {canDelete && order.status === "draf" && (
+                          {canDelete && order.status === "draft" && (
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive cursor-pointer"
                               onClick={() => setOrderToDelete(order)}
@@ -368,7 +611,8 @@ export function PurchaseOrderTable() {
                   )}
                 </TableRow>
               );
-            })}
+            })
+            )}
           </TableBody>
         </Table>
       </div>

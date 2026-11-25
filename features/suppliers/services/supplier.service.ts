@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import { lookupService } from "@/features/lookups/services/lookup.service";
 import type { LookupParams } from "@/features/lookups/types";
 import { cleanDocument, onlyDigits } from "@/lib/masks";
@@ -9,9 +10,16 @@ import type {
   UpdateSupplierRequest,
 } from "../types";
 
+export interface SupplierListParams extends BaseListParams {
+  status?: string;
+}
+
 export const supplierService = {
-  list(params?: { page?: number; per_page?: number }) {
-    return apiClient.get<PaginatedResponse<SupplierResource>>("/v1/suppliers", params);
+  list(params?: SupplierListParams) {
+    return apiClient.get<PaginatedResponse<SupplierResource>>(
+      "/v1/suppliers",
+      cleanListParams(params)
+    );
   },
 
   lookup(params?: LookupParams) {

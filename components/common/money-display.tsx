@@ -1,8 +1,8 @@
 import React from "react";
-import { formatBRL } from "@/lib/formatters";
+import { formatBRL, type MoneyLike } from "@/lib/formatters";
 
 interface MoneyDisplayProps {
-  value: string | number | null | undefined;
+  value: MoneyLike;
   className?: string;
   minDecimals?: number;
   maxDecimals?: number;

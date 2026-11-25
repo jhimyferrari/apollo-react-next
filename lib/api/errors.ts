@@ -130,15 +130,31 @@ export function parseApiError(
     if (statusCode === 404 && code === "UNKNOWN_ERROR") {
       code = "NOT_FOUND";
     }
+    if (statusCode === 429) {
+      if (code === "UNKNOWN_ERROR") {
+        code = "RATE_LIMITED";
+      }
+      if (!payload.error?.message && !payload.message) {
+        message =
+          "Muitas requisições em pouco tempo. Aguarde alguns instantes e tente novamente.";
+      }
+    }
+    if (
+      (statusCode === 502 || statusCode === 503 || statusCode === 504) &&
+      code === "UNKNOWN_ERROR"
+    ) {
+      code = "UPSTREAM_UNAVAILABLE";
+    }
 
     normalizeBackendFieldAliases(fields);
 
     // Heurísticas adicionais para mapear campos quando a API retorna 422 / DUPLICATE_FIELD / INVALID_PASSWORD sem 'fields' estruturado
     if (
-      statusCode === 422 ||
-      code === "VALIDATION_ERROR" ||
-      code === "INVALID_PASSWORD" ||
-      code === "DUPLICATE_FIELD"
+      Object.keys(fields).length === 0 &&
+      (statusCode === 422 ||
+        code === "VALIDATION_ERROR" ||
+        code === "INVALID_PASSWORD" ||
+        code === "DUPLICATE_FIELD")
     ) {
       const lowerMsg = message.toLowerCase();
       if (

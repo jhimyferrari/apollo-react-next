@@ -12,11 +12,21 @@ A arquitetura adota o padrão **Feature-Driven (Modular por Domínio)**. Cada do
 
 ```text
 apollo-react-next/
-├── app/                                    # Next.js App Router (Páginas e Roteamento)
+├── proxy.ts                                # Borda Next.js 16: guarda rápida de rotas públicas/privadas por cookie
+├── next.config.ts                          # Headers de segurança HTTP (CSP, HSTS, X-Frame-Options, etc.)
+├── app/                                    # Next.js App Router (Páginas, Layouts e Route Handlers BFF)
+│   ├── api/                                # Camada BFF (Backend for Frontend) same-origin
+│   │   ├── auth/
+│   │   │   ├── session/route.ts            # GET /api/auth/session -> valida sessão via Laravel GET /v1/me
+│   │   │   └── clear-session/route.ts      # GET /api/auth/clear-session -> limpa cookie expirado e redireciona ao /login
+│   │   ├── v1/
+│   │   │   ├── login/route.ts              # POST /api/v1/login -> grava token em cookie HttpOnly cifrado (sem expor token)
+│   │   │   └── logout/route.ts             # POST /api/v1/logout -> revoga token no Laravel e expira cookie HttpOnly
+│   │   └── [...path]/route.ts              # Proxy reverso /api/v1/* -> injeta Bearer token do cookie HttpOnly
 │   ├── login/page.tsx                      # Tela pública de autenticação multi-tenant
 │   ├── register-organization/page.tsx      # Tela pública de cadastro da organização + admin
 │   ├── (dashboard)/                        # Grupo de rotas protegidas por autenticação
-│   │   ├── layout.tsx                      # App Shell (Sidebar, Header, proteção de sessão)
+│   │   ├── layout.tsx                      # Server Component: valida sessão via /v1/me e hidrata AuthProvider SSR
 │   │   ├── page.tsx                        # Visão geral / Dashboard inicial com KPIs
 │   │   ├── products/                       # Rotas de Catálogo de Produtos (/products, /new, /[id])
 │   │   ├── brands/                         # Rotas de Marcas (/brands, /new, /[id])
@@ -26,6 +36,7 @@ apollo-react-next/
 │   │   ├── suppliers/                      # Rotas de Fornecedores e Endereços (/suppliers, /new, /[id])
 │   │   ├── sales-orders/                   # Rotas de Pedidos de Venda (/sales-orders, /new, /[id])
 │   │   ├── purchase-orders/                # Rotas de Pedidos de Compra (/purchase-orders, /new, /[id])
+│   │   ├── reports/                        # Rotas de Relatórios Gerenciais (/reports, /sales/*, /purchases/*)
 │   │   └── users/                          # Rotas de Usuários e Permissões (/users, /new, /[id])
 │   ├── layout.tsx                          # Root Layout (Providers de Tema, Cache e Toaster)
 │   ├── globals.css                         # Estilos globais e tokens CSS (Tailwind v4)
@@ -33,8 +44,8 @@ apollo-react-next/
 │
 ├── components/                             # Componentes de interface agnósticos de domínio
 │   ├── ui/                                 # Componentes primitivos shadcn/ui (Button, Card, Table, Dialog, Select, etc.)
-│   ├── layout/                             # Componentes estruturais (Sidebar, Header, UserNav)
-│   ├── providers/                          # Provedores de contexto (QueryProvider, ThemeProvider)
+│   ├── layout/                             # Componentes estruturais (DashboardShell, Sidebar, Header, UserNav)
+│   ├── providers/                          # Provedores de contexto (QueryProvider, AuthProvider, ThemeProvider, AccessibilityProvider)
 │   └── common/                             # Componentes visuais e guardas utilitários compartilhados
 │       ├── can.tsx                         # Renderização condicional declarativa baseada em permissões (<Can>)
 │       ├── permission-guard.tsx            # Proteção de página/bloco com tela de "Acesso Restrito" (<PermissionGuard>)
@@ -44,7 +55,7 @@ apollo-react-next/
 │       ├── loading-skeleton.tsx            # Skeletons para tabelas, cards e formulários
 │       ├── confirm-dialog.tsx              # Modal de confirmação para ações críticas ou destrutivas
 │       ├── form-field-error.tsx            # Exibidor padronizado de mensagens de erro por campo
-│       └── money-display.tsx               # Renderizador tipado para strings monetárias em BRL
+│       └── money-display.tsx               # Renderizador tipado (MoneyLike: objeto Money ou string/número) em BRL
 │
 ├── features/                               # Módulos organizados estritamente por domínio de negócio
 │   ├── auth/                               # Domínio: Autenticação, Registro de Organização e Hook usePermissions
@@ -54,8 +65,10 @@ apollo-react-next/
 │   ├── clients/                            # Domínio: Clientes (PF/PJ)
 │   ├── sellers/                            # Domínio: Vendedores (PF/PJ) e Comissão
 │   ├── suppliers/                          # Domínio: Fornecedores (PF/PJ)
-│   ├── sales-orders/                       # Domínio: Pedidos de Venda (Rascunho, Confirmação, Cancelamento, Reabertura)
-│   ├── purchase-orders/                    # Domínio: Pedidos de Compra (Rascunho, Confirmação, Cancelamento, Reabertura)
+│   ├── sales-orders/                       # Domínio: Pedidos de Venda (Rascunho, Confirmação, Cancelamento, Reabertura, Pagamento)
+│   ├── purchase-orders/                    # Domínio: Pedidos de Compra (Rascunho, Confirmação, Cancelamento, Reabertura, Pagamento)
+│   ├── lookups/                            # Domínio: Endpoints leves de seletores (/v1/lookups/*)
+│   ├── reports/                            # Domínio: Relatórios Gerenciais de Vendas e Compras (/v1/reports/*)
 │   ├── addresses/                          # Domínio: Endereços Polimórficos e Base Local IBGE (UF -> Cidade)
 │   │   ├── components/                     # AddressList e AddressDialog (seleção em cascata UF -> Cidade)
 │   │   ├── data/ibge-locations.json        # Base oficial do IBGE com 27 UFs e 5.570 municípios brasileiros
@@ -74,15 +87,24 @@ apollo-react-next/
 │
 ├── lib/                                    # Infraestrutura técnica e utilitários agnósticos
 │   ├── api/
-│   │   ├── client.ts                       # Cliente HTTP tipado sobre fetch nativo com interceptors
-│   │   ├── errors.ts                       # parseApiError e applyApiValidationErrors
+│   │   ├── client.ts                       # Cliente HTTP same-origin (/api) com anti-CSRF e interceptors
+│   │   ├── errors.ts                       # parseApiError (incl. 429 e 502/504) e applyApiValidationErrors
 │   │   └── types.ts                        # Envelopes de resposta (ApiResponse, PaginatedResponse)
 │   ├── auth/
-│   │   ├── token.ts                        # Leitura e escrita do token Bearer (localStorage e cookies)
-│   │   ├── session.ts                      # Persistência e leitura da sessão do usuário logado
+│   │   ├── sync.ts                         # Sincronização de sessão entre abas via BroadcastChannel
+│   │   ├── session.ts                      # Tipo SessionUser e limpeza de credenciais legadas
 │   │   └── permissions.ts                  # Motor de normalização e avaliação de permissões RBAC
+│   ├── bff/                                # Infraestrutura server-only do BFF (não importável no browser)
+│   │   ├── config.ts                       # Variáveis server-only, nomes de cookie e chave AES-256-GCM
+│   │   ├── crypto.ts                       # Cifragem/decifragem autenticada AES-256-GCM (node:crypto)
+│   │   ├── cookies.ts                      # Gestão de cookies HttpOnly (__Host- em produção)
+│   │   ├── security.ts                     # Validação anti-CSRF (Origin/Referer/Sec-Fetch-Site) e path allowlist
+│   │   ├── session.ts                      # fetchServerSession (/v1/me) e sanitizeSessionUser
+│   │   └── proxy.ts                        # Proxy reverso HTTP, sanitização de headers, Cache-Control e timeouts
+│   ├── orders/
+│   │   └── payment-status.ts               # Configuração e regras de transição manual de payment_status
 │   ├── diff.ts                             # Cálculo determinístico de diff para requisições PATCH
-│   ├── formatters.ts                       # Formatadores nativos Intl (Moeda BRL até 4 decimais, Datas pt-BR, Quantidades)
+│   ├── formatters.ts                       # Formatadores nativos Intl (Money, BRL até 4 decimais, Datas pt-BR, Quantidades)
 │   ├── masks.ts                            # Máscaras puras em TypeScript (CNPJ alfanumérico, CPF, CEP, Telefone, NCM, Preço, Estoque)
 │   └── utils.ts                            # Função `cn` para composição de classes Tailwind CSS
 │
@@ -116,16 +138,20 @@ sequenceDiagram
     participant Componente as Componente / Tela (UI)
     participant Hook as Hook de Domínio (TanStack Query)
     participant Service as Service do Domínio
-    participant Client as Cliente HTTP Central
+    participant Client as Cliente HTTP (/api)
+    participant BFF as Next.js BFF (Proxy Reverso)
     participant Backend as API Laravel (Backend)
 
     Usuario->>Componente: Interação (Ex.: Submeter Formulário / Mudar Página)
     Componente->>Hook: Chama Mutação ou Consulta (ex.: useCreateProduct)
     Hook->>Service: Invoca Método do Serviço (ex.: productService.create)
     Service->>Client: Chama Método Tipado (client.post / client.patch)
-    Note over Client: Interceptor injeta Bearer Token e Headers JSON
-    Client->>Backend: Requisição HTTP (JSON)
-    Backend-->>Client: Resposta HTTP (Status 200/201/204/401/403/422)
+    Note over Client: Envia cookie HttpOnly same-origin + X-Requested-With
+    Client->>BFF: Requisição HTTP (/api/v1/*)
+    Note over BFF: Valida CSRF + decifra cookie + injeta Bearer Token
+    BFF->>Backend: Requisição HTTP (API_INTERNAL_URL/v1/*)
+    Backend-->>BFF: Resposta HTTP (200/201/204/401/403/422/429)
+    BFF-->>Client: Resposta HTTP (sem cache; limpa cookie se 401)
     
     alt Sucesso (2xx)
         Client-->>Service: Retorna Dados Tipados (ou undefined em 204)
@@ -144,37 +170,35 @@ sequenceDiagram
         Service-->>Hook: Propaga Erro
         Hook->>Componente: Exibe Toast de Acesso Negado
     else Erro Desautenticado (401 / UNAUTHENTICATED)
-        Client->>Client: Limpa Token e Sessão (removeToken + clearSession)
+        BFF->>BFF: Expira Cookie HttpOnly (Max-Age=0)
+        Client->>Client: Notifica abas (BroadcastChannel)
         Client->>Componente: Redireciona determinísticamente para /login
     end
 ```
 
 ---
 
-## 3. Fluxo de Autenticação e Segurança Multi-Tenant
+## 3. Fluxo de Autenticação, BFF e Segurança Multi-Tenant
 
-A autenticação no Apollo System é **multi-tenant** (vinculada ao documento da Organização) e baseada em token Bearer (Laravel Sanctum):
+A autenticação no Apollo System é **multi-tenant** (vinculada ao documento da Organização) e protegida por uma camada **BFF (Backend for Frontend)** no próprio servidor Next.js 16, mantendo o *Personal Access Token* (Sanctum) **100% isolado do JavaScript no navegador**:
 
-1. **Cadastro de Organização (`POST /v1/organizations`)**:
-   * Cria simultaneamente a Organização (Pessoa Física ou Jurídica) e seu primeiro Usuário Administrador (`is_administrator: true`).
-2. **Login Multi-Tenant (`POST /v1/login`)**:
+1. **Cadastro de Organização (`POST /api/v1/organizations`)**:
+   * Encaminhado pelo proxy reverso do BFF ao Laravel para criar simultaneamente a Organização (Pessoa Física ou Jurídica) e seu primeiro Usuário Administrador (`is_administrator: true`).
+2. **Login Multi-Tenant via BFF (`POST /api/v1/login`)**:
    * O usuário informa `email`, `password` e `organization_document` (CNPJ ou CPF da empresa, enviado sem pontuação via `cleanDocument`).
-   * A API valida o vínculo do usuário com a organização e responde com `{ data: { token: string, user: SessionUser } }`.
-3. **Armazenamento de Credenciais**:
-   * O token é salvo no `localStorage` (`apollo_auth_token`) e sincronizado em cookie de mesmo nome com política `SameSite=Lax` ([`lib/auth/token.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/auth/token.ts)).
-   * Os dados do usuário autenticado (incluindo `is_administrator` e array de `permissions`) são persistidos no `localStorage` (`apollo_user_session`) via [`lib/auth/session.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/auth/session.ts).
-4. **Injeção Automática de Token**:
-   * O cliente HTTP central ([`lib/api/client.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/api/client.ts)) intercepta **todas** as requisições e injeta automaticamente o cabeçalho:
-     ```http
-     Authorization: Bearer <token>
-     Accept: application/json
-     ```
-5. **Proteção de Rotas e Sessão**:
-   * O layout do dashboard ([`app/(dashboard)/layout.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app/(dashboard)/layout.tsx)) verifica a presença do token no cliente ao montar. Caso ausente, redireciona imediatamente para `/login`.
-6. **Expiração e Desautenticação Automática (HTTP 401)**:
-   * Sempre que qualquer endpoint retornar status `401` ou código `UNAUTHENTICATED` (exceto na própria rota `/v1/login`), o interceptor do cliente HTTP limpa a sessão local (`removeToken()`, `clearUserSession()`) e redireciona para `/login`.
-7. **Logout Determinístico (`POST /v1/logout`)**:
-   * Dispara `POST /v1/logout` para revogar o token no backend e, no bloco `finally` (mesmo que haja queda de conexão), remove todas as credenciais locais, limpa o cache do React Query e redireciona para `/login`.
+   * O Route Handler [`app/api/v1/login/route.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app/api/v1/login/route.ts) valida o CSRF, encaminha as credenciais ao Laravel, recebe `{ data: { token, expires_at, user } }`, cifra o token com **AES-256-GCM** e grava-o em cookie **`HttpOnly` + `SameSite=Lax`** (`apollo_token` em dev / `__Host-apollo_token` + `Secure` em produção).
+   * O token **nunca** é retornado ao navegador: o BFF devolve apenas `{ message, data: { user } }` sanitizado, hidratando o [`AuthProvider`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/providers/auth-provider.tsx) em memória.
+3. **Proxy Reverso Autenticado (`/api/[...path]`)**:
+   * O cliente HTTP ([`lib/api/client.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/api/client.ts)) envia requisições `same-origin` para `/api/v1/*` com `credentials: "same-origin"` e `X-Requested-With: XMLHttpRequest`.
+   * O BFF ([`lib/bff/proxy.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/bff/proxy.ts)) valida CSRF (`Origin`/`Referer`/`Sec-Fetch-Site`), valida a allowlist de rota (`/v1/*`), decifra o cookie `HttpOnly` e injeta `Authorization: Bearer <token>` antes de encaminhar ao backend Laravel.
+   * Todas as respostas do BFF retornam `Cache-Control: no-store, no-cache, must-revalidate, private` e `Vary: Cookie`.
+4. **Proteção de Rotas e Sessão SSR (`proxy.ts` + `(dashboard)/layout.tsx`)**:
+   * A borda [`proxy.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/proxy.ts) redireciona requisições sem cookie de sessão diretamente para `/login` e usuários autenticados que acessam `/login` ou `/register-organization` para `/`.
+   * O layout do dashboard ([`app/(dashboard)/layout.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app/(dashboard)/layout.tsx)) executa como **Server Component**, consulta `GET /v1/me` no servidor via [`fetchServerSession`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/bff/session.ts) antes de renderizar qualquer HTML e injeta `initialUser` no [`AuthProvider`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/providers/auth-provider.tsx).
+5. **Expiração e Desautenticação Automática (HTTP 401)**:
+   * Quando qualquer endpoint autenticado retorna `401` (`UNAUTHENTICATED`), o BFF expira o cookie `HttpOnly` (`Max-Age=0`) e o cliente HTTP dispara `broadcastAuthEvent("logout")` via `BroadcastChannel("apollo-auth")`, redirecionando todas as abas abertas para `/login` (exceto em tentativas inválidas na própria rota `/v1/login`).
+6. **Logout Determinístico (`POST /api/v1/logout`)**:
+   * O BFF revoga o token no Laravel (`POST /v1/logout`), expira o cookie `HttpOnly` mesmo em caso de falha de rede, limpa o cache do React Query e notifica as demais abas via `BroadcastChannel`.
 
 ---
 
@@ -231,7 +255,9 @@ export interface ParsedApiError {
 * **Erros de Autorização (`403 Forbidden`)**:
   * Quando um usuário autenticado tenta executar uma operação para a qual não possui permissão no backend, a API retorna `403 Forbidden`, sendo exibido um alerta claro via `toast.error`. Além disso, a própria UI previne proativamente essas ações ocultando botões e protegendo rotas com RBAC.
 * **Erros de Sessão (`401 Unauthenticated`)**:
-  * Limpeza imediata da sessão local e redirecionamento para `/login`.
+  * O BFF remove o cookie `HttpOnly` e o cliente redireciona para `/login` sincronizando as demais abas.
+* **Limitação de Taxa e Disponibilidade (`429 Rate Limited` / `502-504 Upstream Unavailable`)**:
+  * Mapeados explicitamente por `parseApiError` para os códigos `RATE_LIMITED` e `UPSTREAM_UNAVAILABLE` com mensagens amigáveis ao usuário.
 
 ---
 
@@ -278,6 +304,7 @@ Os 9 domínios controlados são:
 
 > [!NOTE]
 > O domínio de **Endereços (`addresses`)** é polimórfico e herda as permissões do seu respectivo proprietário (`client.*`, `seller.*` ou `supplier.*`).
+> Das **36 permissões atômicas** do backend, as **4 permissões de Usuários (`user.*`)** são reservadas a administradores, enquanto as **32 permissões operacionais** dos demais 8 domínios são atribuíveis na matriz da UI de usuários.
 
 ### 6.2. Arquitetura de Verificação no Frontend
 
@@ -285,8 +312,8 @@ Os 9 domínios controlados são:
    * A função `normalizePermissionKey` garante compatibilidade transparente entre chaves no singular/plural ou com sufixo `.read`/`.view` (ex.: `products.read` $\rightarrow$ `product.view`).
    * Usuários com `is_administrator: true` possuem passe livre automático em `hasPermission()`.
 2. **Hook `usePermissions` ([`features/auth/hooks/use-permissions.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/auth/hooks/use-permissions.ts))**:
-   * Expõe `{ can, isAdministrator, permissions, user }`.
-   * Caso o usuário logado não seja administrador e sua sessão ainda não contenha a lista de permissões, sincroniza automaticamente via `GET /v1/users/{id}` com cache de 5 minutos.
+   * Expõe `{ can, isAdministrator, permissions, user, isInitialized }`.
+   * Consome diretamente a sessão autenticada do [`AuthProvider`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/providers/auth-provider.tsx), hidratada inicialmente no SSR via `GET /v1/me` e revalidada em background pelo TanStack Query (`GET /api/auth/session`).
 3. **Componente `<Can>` ([`components/common/can.tsx`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/components/common/can.tsx))**:
    * Envolve botões de criação, edição, exclusão e ações transacionais para ocultá-los quando o operador não possui a permissão exigida:
      ```tsx
@@ -328,21 +355,21 @@ Os módulos de **Pedidos de Venda (`sales-orders`)** e **Pedidos de Compra (`pur
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draf : Criação (POST /v1/*-orders)
-    draf --> draf : Edição de Cabeçalho e Diff de Itens (PATCH /v1/*-orders/{id})
-    draf --> confirmed : Confirmar Pedido (PATCH /v1/*-orders/{id}/confirm)
-    draf --> cancelled : Cancelar Rascunho (PATCH /v1/*-orders/{id}/cancel)
+    [*] --> draft: Criação (POST /v1/*-orders)
+    draft--> draft: Edição de Cabeçalho e Diff de Itens (PATCH /v1/*-orders/{id})
+    draft--> confirmed : Confirmar Pedido (PATCH /v1/*-orders/{id}/confirm)
+    draft--> cancelled : Cancelar Rascunho (PATCH /v1/*-orders/{id}/cancel)
     confirmed --> cancelled : Cancelar Pedido Confirmado (Estorna Estoque)
-    confirmed --> draf : Reabrir Pedido (Cancela original + Cria novo Rascunho vinculado)
-    cancelled --> draf : Reabrir Pedido (Cria novo Rascunho vinculado ao cancelado)
+    confirmed --> draft: Reabrir Pedido (Cancela original + Cria novo Rascunho vinculado)
+    cancelled --> draft: Reabrir Pedido (Cria novo Rascunho vinculado ao cancelado)
 ```
 
 ### 8.1. Particularidades Técnicas Importantes dos Pedidos
 
-1. **Valor Literal do Status de Rascunho (`"draf"`)**:
-   * Por contrato do backend Laravel (`OrderStatus::Draft = 'draf'`), o status de rascunho no JSON é grafado literalmente como `"draf"`. Todos os tipos TypeScript, filtros e badges do frontend respeitam essa constante exata.
+1. **Valor Literal do Status de Rascunho (`"draft"`)**:
+   * Por contrato do backend Laravel (`OrderStatus::Draft = 'draft'`), o status de rascunho no JSON é grafado literalmente como `"draft"`. Todos os tipos TypeScript, filtros e badges do frontend respeitam essa constante exata.
 2. **Operações Delta em Itens na Edição de Rascunho (`items.to_add`, `to_update`, `to_remove`)**:
-   * Enquanto um pedido está em rascunho (`draf`), sua edição (`PATCH /v1/{orders}/{id}`) não sobrescreve cegamente a lista de itens. O formulário compara os itens originais (identificados pelo seu número sequencial `number`) com os itens atuais e monta o objeto delta:
+   * Enquanto um pedido está em rascunho (`draft`), sua edição (`PATCH /v1/{orders}/{id}`) não sobrescreve cegamente a lista de itens. O formulário compara os itens originais (identificados pelo seu número sequencial `number`) com os itens atuais e monta o objeto delta:
      * `to_add`: Novos produtos adicionados ao pedido (`{ product_id, quantity }`).
      * `to_update`: Itens existentes cuja quantidade ou produto foi alterado (`{ number, product_id, quantity }`).
      * `to_remove`: Itens existentes removidos pelo usuário (`{ number }`).
@@ -351,8 +378,12 @@ stateDiagram-v2
    * Ao confirmar um **Pedido de Compra**, o backend realiza a entrada de estoque (`StockMovement` de entrada).
 4. **Reabertura de Pedido (`/reopen`), Rastreabilidade e Divergência de Preços (`outdated_prices`)**:
    * Pedidos nos status `confirmed` ou `cancelled` não podem ser editados diretamente, mas podem ser **Reabertos** (`PATCH /v1/{orders}/{id}/reopen`).
-   * A reabertura cancela o pedido original (caso ainda esteja confirmado, estornando o estoque) e cria automaticamente um **novo pedido em rascunho (`draf`)** contendo os mesmos itens e vinculado ao pedido anterior através de `replaces_order_id` (exibido na UI pelos links de rastreabilidade *"Substitui o pedido #X"* e *"Substituído pelo pedido #Y"*).
+   * A reabertura cancela o pedido original (caso ainda esteja confirmado, estornando o estoque) e cria automaticamente um **novo pedido em rascunho (`draft`)** contendo os mesmos itens e vinculado ao pedido anterior através de `replaces_order_id` (exibido na UI pelos links de rastreabilidade *"Substitui o pedido #X"* e *"Substituído pelo pedido #Y"*).
    * Se o preço de catálogo de algum produto tiver sofrido alteração desde a emissão do pedido original, o endpoint `/reopen` retorna a lista `outdated_prices` (contendo `negotiated_price` vs. `current_price`), apresentada em um banner de alerta detalhado na tela do novo pedido.
+5. **Fluxo Dedicado de Status de Pagamento (`PATCH /v1/{orders}/{id}/payment-status`)**:
+   * O `payment_status` possui 4 valores possíveis: `pending`, `paid`, `refunded` e `cancelled`, desacoplados da edição cadastral de rascunho (`PATCH /v1/{orders}/{id}`).
+   * As transições manuais permitidas são centralizadas em [`lib/orders/payment-status.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/orders/payment-status.ts) (`getAvailablePaymentAction`): em pedidos `draft` ou `confirmed`, alterna `pending` ↔ `paid`; em pedidos `cancelled` ainda pagos (`paid`), permite apenas estornar para `refunded`.
+   * Eventos de pagamento e estorno registram os timestamps `paid_at` e `refunded_at` retornados pela API e exibidos nos detalhes do pedido.
 
 ---
 
@@ -363,7 +394,7 @@ stateDiagram-v2
 * **Edição (`PATCH /v1/products/{id}`)**: O campo `stock_quantity` é ocultado da UI e omitido do payload. Ajustes posteriores de estoque ocorrem exclusivamente por meio da confirmação ou cancelamento de **Pedidos de Compra** e **Pedidos de Venda**.
 
 ### 9.2. Precisão Monetária e Formatação (`lib/formatters.ts` e `lib/masks.ts`)
-* **Valores Monetários (`formatBRL`)**: A API retorna valores financeiros como strings decimais (até 4 casas decimais, ex.: `"1250.50"` ou `"12.3456"`). O formatador `formatBRL` preserva de 2 a 4 casas decimais significativas utilizando `Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" })`.
+* **Contrato `Money` e `formatBRL`**: Os endpoints de pedidos e relatórios retornam valores monetários serializados como objeto `Money` (`{ amount, currency, formatted }`), enquanto outros recursos podem retornar strings decimais (até 4 casas decimais, ex.: `"1250.50"` ou `"12.3456"`). O tipo `MoneyLike`, o extrator `extractMoneyAmount` e o formatador `formatBRL` (usado por `MoneyDisplay`) aceitam ambos os formatos sem perda de precisão, preservando de 2 a 4 casas decimais significativas via `Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" })`.
 * **Máscaras de Digitação com Vírgula (`maskPrice` e `maskStock`)**:
   * Permitem digitar números utilizando vírgula (ou ponto do teclado numérico, convertido automaticamente para vírgula) com até **4 casas decimais para preços** e até **3 casas decimais para quantidades de estoque**.
   * Na submissão do formulário, o valor é sanitizado para número JSON válido (`Number(val.replace(",", "."))`).

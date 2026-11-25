@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { supplierService } from "../services/supplier.service";
+import { supplierService, type SupplierListParams } from "../services/supplier.service";
 import { parseApiError } from "@/lib/api/errors";
 import { useSupplierLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreSupplierRequest, UpdateSupplierRequest } from "../types";
 
 export { useSupplierLookup };
 
-export function useSuppliers(page = 1) {
+export function useSuppliers(params?: SupplierListParams) {
   return useQuery({
-    queryKey: ["suppliers", page],
-    queryFn: () => supplierService.list({ page }),
+    queryKey: ["suppliers", params ?? {}],
+    queryFn: () => supplierService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -54,9 +55,15 @@ export function useUpdateSupplier() {
       id: string;
       data: Partial<UpdateSupplierRequest>;
     }) => supplierService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["lookups", "suppliers"] });
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["suppliers", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
+        queryClient.invalidateQueries({ queryKey: ["lookups", "suppliers"] }),
+      ]);
       toast.success("Fornecedor atualizado com sucesso!");
     },
     onError: (err) => {

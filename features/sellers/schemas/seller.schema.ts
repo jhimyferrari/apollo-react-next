@@ -23,10 +23,12 @@ export const sellerSchema = z.object({
     }, "Documento deve ser um CPF (11 dígitos) ou CNPJ (14 caracteres) válido"),
   legal_name: z
     .string()
+    .trim()
     .min(1, "Razão Social / Nome Completo é obrigatório")
     .max(255, "Nome muito longo"),
   trade_name: z
     .string()
+    .trim()
     .min(1, "Nome Fantasia / Apelido é obrigatório")
     .max(255, "Nome Fantasia muito longo"),
   state_registration: z.string().optional().nullable(),
@@ -34,9 +36,12 @@ export const sellerSchema = z.object({
     .string()
     .optional()
     .nullable()
-    .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
-      message: "E-mail inválido",
-    }),
+    .refine(
+      (val) => !val?.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim()),
+      {
+        message: "E-mail inválido",
+      }
+    ),
   phone: z.string().optional().nullable(),
   started_at: z
     .string()

@@ -10,14 +10,7 @@ import { usePurchaseOrder } from "@/features/purchase-orders/hooks/use-purchase-
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function ViewPurchaseOrderPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
+function ViewPurchaseOrderContent({ id }: { id: string }) {
   const { data, isLoading, isError, error, refetch } = usePurchaseOrder(id);
   const order = data?.data;
 
@@ -62,19 +55,32 @@ export default function ViewPurchaseOrderPage({
   }
 
   return (
+    <div className="space-y-6">
+      <PageHeader
+        title={`Pedido de Compra #${order.number}`}
+        description={`Fornecedor: ${order.supplier?.legal_name || "N/A"}`}
+      />
+
+      <PurchaseOrderDetails key={order.id} order={order} />
+    </div>
+  );
+}
+
+export default function ViewPurchaseOrderPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
     <PermissionGuard
       permission="purchase-order.view"
       title="Acesso Restrito"
       description="Você não possui permissão para visualizar os detalhes deste pedido de compra."
     >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Pedido de Compra #${order.number}`}
-          description={`Fornecedor: ${order.supplier?.legal_name || "N/A"}`}
-        />
-
-        <PurchaseOrderDetails order={order} />
-      </div>
+      <ViewPurchaseOrderContent id={id} />
     </PermissionGuard>
   );
 }

@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import { lookupService } from "@/features/lookups/services/lookup.service";
 import type { LookupParams } from "@/features/lookups/types";
 import type {
@@ -8,9 +9,14 @@ import type {
   UpdateBrandRequest,
 } from "../types";
 
+export type BrandListParams = BaseListParams;
+
 export const brandService = {
-  list(params?: { page?: number; per_page?: number }) {
-    return apiClient.get<PaginatedResponse<BrandResource>>("/v1/brands", params);
+  list(params?: BrandListParams) {
+    return apiClient.get<PaginatedResponse<BrandResource>>(
+      "/v1/brands",
+      cleanListParams(params)
+    );
   },
 
   lookup(params?: LookupParams) {

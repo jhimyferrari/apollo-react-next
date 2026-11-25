@@ -20,6 +20,7 @@ import { FormFieldError } from "@/components/common/form-field-error";
 import { AddressList } from "@/features/addresses/components/address-list";
 import { clientSchema, type ClientFormData } from "../schemas/client.schema";
 import { useCreateClient, useUpdateClient } from "../hooks/use-clients";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { maskDocument, maskPhone, cleanDocument, onlyDigits } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
@@ -32,6 +33,7 @@ interface ClientFormProps {
 export function ClientForm({ initialData }: ClientFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialData);
+  const { can } = usePermissions();
 
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
@@ -110,11 +112,13 @@ export function ClientForm({ initialData }: ClientFormProps) {
           phone: sanitizedPhone,
         });
 
-        // Redireciona para tela de edição para permitir cadastrar endereços
-        if (res?.data?.id) {
+        // Redireciona para tela de edição para permitir cadastrar endereços apenas se possuir permissão
+        if (res?.data?.id && can("client.view") && can("client.update")) {
           router.push(`/clients/${res.data.id}`);
           return;
         }
+        router.push(can("client.view") ? "/clients" : "/");
+        return;
       }
 
       router.push("/clients");

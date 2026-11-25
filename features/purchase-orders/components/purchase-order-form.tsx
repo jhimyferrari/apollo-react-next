@@ -9,16 +9,8 @@ import { Loader2, ArrowLeft, Save, Plus, Trash2, ShoppingBag } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormFieldError } from "@/components/common/form-field-error";
-import { ResourceCreateShortcut } from "@/components/common/resource-create-shortcut";
 import { MoneyDisplay } from "@/components/common/money-display";
 import {
   purchaseOrderSchema,
@@ -29,7 +21,13 @@ import {
   useSupplierLookup,
   useProductLookup,
 } from "@/features/lookups/hooks/use-lookups";
-import { extractLookupAmount } from "@/features/lookups/types";
+import { LookupCodeSelect } from "@/features/lookups/components/lookup-code-select";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import {
+  extractLookupAmount,
+  type ProductLookupResource,
+  type SupplierLookupResource,
+} from "@/features/lookups/types";
 import { maskDocument, maskStock } from "@/lib/masks";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 
@@ -74,10 +72,19 @@ export function PurchaseOrderForm() {
 
   const isSubmitting = createMutation.isPending;
 
-  const handleProductChange = (index: number, productId: string) => {
+  const handleProductChange = (
+    index: number,
+    productId: string,
+    resolvedProduct?: ProductLookupResource
+  ) => {
     setValue(`items.${index}.product_id`, productId, { shouldValidate: true });
 
-    const prod = products.find((p) => p.id === productId);
+    if (!productId) {
+      setValue(`items.${index}.unit_price`, "0.0000");
+      return;
+    }
+
+    const prod = resolvedProduct ?? products.find((p) => p.id === productId);
     if (prod) {
       const priceStr = extractLookupAmount(prod.cost_price, "0");
       setValue(`items.${index}.unit_price`, priceStr);
@@ -119,33 +126,22 @@ export function PurchaseOrderForm() {
           <Label htmlFor="supplier_id" className="text-sm font-medium">
             Fornecedor <span className="text-destructive">*</span>
           </Label>
-          <div className="flex items-center gap-1.5">
-            <Select
-              value={supplierIdValue}
-              onValueChange={(val) =>
-                setValue("supplier_id", val, { shouldValidate: true })
-              }
-              disabled={isLoadingSuppliers || isSubmitting}
-            >
-              <SelectTrigger id="supplier_id" className="flex-1 min-w-0">
-                <SelectValue placeholder="Selecione o fornecedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    #{s.number} - {s.name}
-                    {s.document ? ` (${maskDocument(s.document)})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <ResourceCreateShortcut
-              href="/suppliers/new"
-              label="Cadastrar novo fornecedor"
-              permission="supplier.create"
-              disabled={isSubmitting}
-            />
-          </div>
+          <LookupCodeSelect<SupplierLookupResource>
+            id="supplier_id"
+            value={supplierIdValue}
+            onValueChange={(val) =>
+              setValue("supplier_id", val, { shouldValidate: true })
+            }
+            options={suppliers}
+            lookupByNumber={(num) => lookupService.supplierByNumber(num)}
+            renderOptionLabel={(s) =>
+              `${s.number} - ${s.name}${s.document ? ` (${maskDocument(s.document)})` : ""}`
+            }
+            placeholder="Selecione o fornecedor"
+            resourceLabel="Fornecedor"
+            disabled={isSubmitting}
+            isLoadingOptions={isLoadingSuppliers}
+          />
           <FormFieldError error={errors.supplier_id} />
         </div>
       </div>
@@ -197,30 +193,21 @@ export function PurchaseOrderForm() {
                   {/* Seleção de Produto */}
                   <div className="md:col-span-5 space-y-1">
                     <Label className="text-xs font-medium">Produto</Label>
-                    <div className="flex items-center gap-1.5">
-                      <Select
-                        value={watchedItems[index]?.product_id || ""}
-                        onValueChange={(val) => handleProductChange(index, val)}
-                        disabled={isLoadingProducts || isSubmitting}
-                      >
-                        <SelectTrigger className="flex-1 min-w-0">
-                          <SelectValue placeholder="Selecione um produto..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              #{p.number} - {p.name} ({p.unit.toUpperCase()})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <ResourceCreateShortcut
-                        href="/products/new"
-                        label="Cadastrar novo produto"
-                        permission="product.create"
-                        disabled={isSubmitting}
-                      />
-                    </div>
+                    <LookupCodeSelect<ProductLookupResource>
+                      value={watchedItems[index]?.product_id || ""}
+                      onValueChange={(val, resolved) =>
+                        handleProductChange(index, val, resolved)
+                      }
+                      options={products}
+                      lookupByNumber={(num) => lookupService.productByNumber(num)}
+                      renderOptionLabel={(p) =>
+                        `${p.number} - ${p.name} (${p.unit.toUpperCase()})`
+                      }
+                      placeholder="Selecione um produto..."
+                      resourceLabel="Produto"
+                      disabled={isSubmitting}
+                      isLoadingOptions={isLoadingProducts}
+                    />
                     <FormFieldError error={errors.items?.[index]?.product_id} />
                   </div>
 

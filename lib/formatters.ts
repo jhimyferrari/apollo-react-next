@@ -2,9 +2,17 @@
  * Utilitários de formatação para pt-BR e moeda brasileira (BRL).
  *
  * REGRA CRÍTICA DO CONTRATO DA API:
- * Campos Money chegam como string no JSON (ex.: "1250.50", "99.90").
+ * Campos Money podem chegar como objeto `{ amount, currency, formatted }` ou string numérica.
  * NUNCA converter para float binário para evitar perda de precisão de ponto flutuante.
  */
+
+export interface MoneySerialized {
+  amount: string;
+  currency?: string;
+  formatted?: string;
+}
+
+export type MoneyLike = string | number | MoneySerialized | null | undefined;
 
 export interface FormatBRLOptions {
   minDecimals?: number;
@@ -12,18 +20,36 @@ export interface FormatBRLOptions {
 }
 
 /**
- * Formata um valor de dinheiro (string vinda do backend ou número) para BRL.
- * Suporta até 4 dígitos decimais para variáveis monetárias do sistema (ex.: "1234.5678" -> "R$ 1.234,5678").
+ * Extrai a string numérica de um campo `Money` (objeto `{ amount }` ou primitivo `string | number`).
+ */
+export function extractMoneyAmount(value: MoneyLike, fallback = "0"): string {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "object") {
+    return value.amount !== undefined && value.amount !== null && value.amount !== ""
+      ? String(value.amount)
+      : fallback;
+  }
+  return String(value);
+}
+
+/**
+ * Formata um valor de dinheiro (objeto Money, string vinda do backend ou número) para BRL.
+ * Suporta até 4 dígitos decimais para valores fracionários do sistema (ex.: "1234.5678" -> "R$ 1.234,5678").
  */
 export function formatBRL(
-  value: string | number | null | undefined,
+  value: MoneyLike,
   options?: FormatBRLOptions
 ): string {
   if (value === null || value === undefined || value === "") {
     return "R$ 0,00";
   }
 
-  const strVal = String(value).trim().replace(",", ".");
+  const rawAmount = typeof value === "object" ? value.amount : value;
+  if (rawAmount === null || rawAmount === undefined || rawAmount === "") {
+    return "R$ 0,00";
+  }
+
+  const strVal = String(rawAmount).trim().replace(",", ".");
   const numericVal = Number(strVal);
 
   if (Number.isNaN(numericVal)) {
@@ -34,10 +60,13 @@ export function formatBRL(
   const decimalPart = strVal.split(".")[1] || "";
   const significantDecimals = decimalPart.replace(/0+$/, "").length;
 
-  const minDecimals =
+  const rawMin =
     options?.minDecimals ?? (significantDecimals > 2 ? Math.min(significantDecimals, 4) : 2);
-  const maxDecimals =
-    options?.maxDecimals ?? Math.max(minDecimals, Math.min(Math.max(significantDecimals, 2), 4));
+  const rawMax =
+    options?.maxDecimals ?? Math.max(rawMin, Math.min(Math.max(significantDecimals, 2), 4));
+
+  const maxDecimals = Math.min(20, Math.max(0, Math.floor(rawMax)));
+  const minDecimals = Math.min(maxDecimals, Math.max(0, Math.floor(rawMin)));
 
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",

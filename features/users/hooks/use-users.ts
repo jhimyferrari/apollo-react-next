@@ -1,15 +1,21 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { userService } from "../services/user.service";
+import { userService, type UserListParams } from "../services/user.service";
+import { AUTH_SESSION_QUERY_KEY } from "@/components/providers/auth-provider";
 import { parseApiError } from "@/lib/api/errors";
-import type { StoreUserRequest, UpdateUserRequest } from "../types";
+import type {
+  StoreUserRequest,
+  UpdateUserRequest,
+  UpdateOwnPasswordRequest,
+} from "../types";
 
-export function useUsers(page = 1) {
+export function useUsers(params?: UserListParams) {
   return useQuery({
-    queryKey: ["users", page],
-    queryFn: () => userService.list({ page }),
+    queryKey: ["users", params ?? {}],
+    queryFn: () => userService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -45,15 +51,39 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateUserRequest }) =>
       userService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["current-user-permissions"] });
-      toast.success("Permissões do usuário atualizadas!");
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["users", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+        queryClient.invalidateQueries({ queryKey: AUTH_SESSION_QUERY_KEY }),
+      ]);
+      toast.success("Usuário atualizado com sucesso!");
     },
     onError: (err) => {
       const parsed = parseApiError(err);
       if (!parsed.isValidationError) {
-        toast.error(parsed.message || "Erro ao atualizar permissões.");
+        toast.error(parsed.message || "Erro ao atualizar usuário.");
+      }
+    },
+  });
+}
+
+export function useUpdateOwnPassword() {
+  return useMutation({
+    mutationFn: (data: UpdateOwnPasswordRequest) =>
+      userService.updateOwnPassword(data),
+    onSuccess: () => {
+      toast.success(
+        "Senha atualizada com sucesso! Outras sessões ativas foram encerradas."
+      );
+    },
+    onError: (err) => {
+      const parsed = parseApiError(err);
+      if (!parsed.isValidationError) {
+        toast.error(parsed.message || "Erro ao atualizar senha.");
       }
     },
   });

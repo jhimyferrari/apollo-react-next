@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { productService } from "../services/product.service";
+import { productService, type ProductListParams } from "../services/product.service";
 import { parseApiError } from "@/lib/api/errors";
 import { useProductLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreProductRequest, UpdateProductRequest } from "../types";
 
 export { useProductLookup };
 
-export function useProducts(page = 1, perPage = 15) {
+export function useProducts(params?: ProductListParams) {
   return useQuery({
-    queryKey: ["products", page, perPage],
-    queryFn: () => productService.list({ page, per_page: perPage }),
+    queryKey: ["products", params ?? {}],
+    queryFn: () => productService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -54,9 +55,15 @@ export function useUpdateProduct() {
       id: string;
       diff: Partial<UpdateProductRequest>;
     }) => productService.update(id, diff),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["lookups", "products"] });
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["products", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["lookups", "products"] }),
+      ]);
       toast.success("Produto atualizado com sucesso!");
     },
     onError: (err) => {

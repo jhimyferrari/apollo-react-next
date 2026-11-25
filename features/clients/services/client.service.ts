@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import { lookupService } from "@/features/lookups/services/lookup.service";
 import type { LookupParams } from "@/features/lookups/types";
 import { cleanDocument, onlyDigits } from "@/lib/masks";
@@ -9,9 +10,16 @@ import type {
   UpdateClientRequest,
 } from "../types";
 
+export interface ClientListParams extends BaseListParams {
+  status?: string;
+}
+
 export const clientService = {
-  list(params?: { page?: number; per_page?: number }) {
-    return apiClient.get<PaginatedResponse<ClientResource>>("/v1/clients", params);
+  list(params?: ClientListParams) {
+    return apiClient.get<PaginatedResponse<ClientResource>>(
+      "/v1/clients",
+      cleanListParams(params)
+    );
   },
 
   lookup(params?: LookupParams) {

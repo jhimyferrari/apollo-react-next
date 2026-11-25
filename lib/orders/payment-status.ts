@@ -1,4 +1,4 @@
-export type OrderLifecycleStatus = "draf" | "confirmed" | "cancelled";
+export type OrderLifecycleStatus = "draft" | "confirmed" | "cancelled";
 export type OrderPaymentStatus = "pending" | "paid" | "refunded" | "cancelled";
 
 export interface PaymentStatusDisplay {
@@ -61,7 +61,7 @@ export function getAvailablePaymentAction(
   orderStatus: OrderLifecycleStatus,
   paymentStatus: OrderPaymentStatus
 ): PaymentTransitionAction | null {
-  if (orderStatus === "draf" || orderStatus === "confirmed") {
+  if (orderStatus === "draft" || orderStatus === "confirmed") {
     if (paymentStatus === "pending") {
       return {
         targetStatus: "paid",

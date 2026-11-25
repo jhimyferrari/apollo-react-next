@@ -54,7 +54,11 @@ export function DataTablePagination({
           variant="outline"
           size="icon"
           className="h-8 w-8"
-          onClick={() => onPageChange(current_page - 1)}
+          onClick={() =>
+            onPageChange(
+              Math.max(1, Math.min(current_page - 1, Math.max(1, last_page)))
+            )
+          }
           disabled={current_page <= 1 || isLoading}
           title="Página anterior"
         >

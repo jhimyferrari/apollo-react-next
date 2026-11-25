@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -21,17 +21,41 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTablePagination } from "@/components/common/data-table-pagination";
+import {
+  DataTableToolbar,
+  SortableTableHead,
+} from "@/components/common/data-table-toolbar";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { maskDocument, maskPhone } from "@/lib/masks";
+import { toggleSortState, type SortState } from "@/lib/table-utils";
 import { useClients, useDeleteClient } from "../hooks/use-clients";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, Edit, Trash2, Plus, AlertCircle, Users } from "lucide-react";
 import type { ClientResource } from "../types";
 
+type ClientSortKey = "number" | "legal_name" | "document" | "status";
+
+const CLIENT_SORT_OPTIONS: Array<{ value: ClientSortKey; label: string }> = [
+  { value: "number", label: "Código (#)" },
+  { value: "legal_name", label: "Nome / Razão" },
+  { value: "document", label: "CPF / CNPJ" },
+  { value: "status", label: "Status" },
+];
+
 export function ClientTable() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortState, setSortState] = useState<SortState<ClientSortKey> | null>(
+    null
+  );
+  const [appliedFilters, setAppliedFilters] = useState<{
+    search: string;
+    status: string;
+    sortState: SortState<ClientSortKey> | null;
+  }>({ search: "", status: "all", sortState: null });
   const [clientToDelete, setClientToDelete] = useState<ClientResource | null>(null);
 
   const { can } = usePermissions();
@@ -41,17 +65,68 @@ export function ClientTable() {
   const canDelete = can("client.delete");
   const hasActions = canEdit || canDelete;
 
-  const { data, isLoading, isError, error, refetch } = useClients(page);
+  const { data, isLoading, isFetching, isError, error, refetch } = useClients({
+    page,
+    search: appliedFilters.search,
+    status: appliedFilters.status,
+    sort_by: appliedFilters.sortState?.key,
+    sort_direction: appliedFilters.sortState?.direction,
+  });
   const deleteMutation = useDeleteClient();
 
-  const clients = data?.data || [];
+  const clients = useMemo(() => data?.data || [], [data]);
   const meta = data?.meta;
+
+  const hasDraftFilters =
+    search.trim() !== "" || statusFilter !== "all" || sortState !== null;
+  const hasAppliedFilters =
+    appliedFilters.search.trim() !== "" ||
+    appliedFilters.status !== "all" ||
+    appliedFilters.sortState !== null;
+  const hasActiveFilters = hasDraftFilters || hasAppliedFilters;
+
+  const handleApplyFilters = () => {
+    const isSame =
+      appliedFilters.search === search &&
+      appliedFilters.status === statusFilter &&
+      appliedFilters.sortState?.key === sortState?.key &&
+      appliedFilters.sortState?.direction === sortState?.direction;
+
+    if (isSame && page === 1) {
+      void refetch();
+      return;
+    }
+
+    setAppliedFilters({ search, status: statusFilter, sortState });
+    setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setSortState(null);
+    setAppliedFilters({ search: "", status: "all", sortState: null });
+    setPage(1);
+  };
+
+  const handleHeaderSort = (key: string) => {
+    const nextSort = toggleSortState(
+      appliedFilters.sortState,
+      key as ClientSortKey
+    );
+    setSortState(nextSort);
+    setAppliedFilters((prev) => ({ ...prev, sortState: nextSort }));
+    setPage(1);
+  };
 
   const handleDeleteConfirm = async () => {
     if (!clientToDelete) return;
     try {
       await deleteMutation.mutateAsync(clientToDelete.id);
       setClientToDelete(null);
+      if (clients.length === 1 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -92,7 +167,7 @@ export function ClientTable() {
     );
   }
 
-  if (clients.length === 0) {
+  if (clients.length === 0 && !hasAppliedFilters && page === 1 && (meta?.total ?? 0) === 0) {
     return (
       <EmptyState
         icon={Users}
@@ -114,22 +189,121 @@ export function ClientTable() {
 
   return (
     <div className="space-y-4">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por nome, fantasia, código, CPF/CNPJ ou contato..."
+        filters={[
+          {
+            id: "status",
+            label: "Status",
+            value: statusFilter,
+            allLabel: "Todos os status",
+            options: [
+              { value: "active", label: "Ativo" },
+              { value: "inactive", label: "Inativo" },
+            ],
+            onChange: setStatusFilter,
+          },
+        ]}
+        sortOptions={CLIENT_SORT_OPTIONS}
+        sortState={sortState}
+        onSortKeyChange={(key) =>
+          setSortState(
+            key ? { key: key as ClientSortKey, direction: sortState?.direction ?? "asc" } : null
+          )
+        }
+        onSortDirectionToggle={() =>
+          setSortState((prev) =>
+            prev
+              ? { ...prev, direction: prev.direction === "asc" ? "desc" : "asc" }
+              : null
+          )
+        }
+        onSubmit={handleApplyFilters}
+        onClearAll={clearAllFilters}
+        hasActiveFilters={hasActiveFilters}
+        isFetching={isFetching && !isLoading}
+        filteredCount={clients.length}
+        totalCount={meta?.total ?? clients.length}
+      />
+
       <div className="rounded-md border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">#</TableHead>
-              <TableHead>Cliente (Razão / Fantasia)</TableHead>
-              <TableHead>CPF / CNPJ</TableHead>
+              <SortableTableHead
+                label="#"
+                sortKey="number"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-16"
+              />
+              <SortableTableHead
+                label="Cliente (Razão / Fantasia)"
+                sortKey="legal_name"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+              />
+              <SortableTableHead
+                label="CPF / CNPJ"
+                sortKey="document"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+              />
               <TableHead>Contato</TableHead>
-              <TableHead className="w-24">Status</TableHead>
+              <SortableTableHead
+                label="Status"
+                sortKey="status"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-24"
+              />
               {hasActions && (
                 <TableHead className="w-16 text-center">Ações</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.map((client) => (
+            {clients.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={hasActions ? 6 : 5}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  {page > 1 && meta && meta.total > 0 ? (
+                    <>
+                      <p>Nenhum registro nesta página.</p>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setPage(Math.max(1, meta.last_page))}
+                        className="mt-1"
+                      >
+                        Ir para a última página
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Nenhum cliente encontrado com os filtros atuais.</p>
+                      {hasAppliedFilters && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          onClick={clearAllFilters}
+                          className="mt-1"
+                        >
+                          Limpar filtros
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              clients.map((client) => (
               <TableRow key={client.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   #{client.number}
@@ -198,7 +372,8 @@ export function ClientTable() {
                   </TableCell>
                 )}
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>

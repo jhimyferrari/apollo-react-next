@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/common/empty-state";
+import { formatBRL } from "@/lib/formatters";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import {
   useSalesSummaryReport,
@@ -106,14 +107,14 @@ export default function ReportsIndexPage() {
                 <>
                   <StatCard
                     title="Vendas Confirmadas"
-                    value={salesTotals?.total_amount_formatted ?? "R$ 0,00"}
+                    value={formatBRL(salesTotals?.total_amount)}
                     hint={`${salesTotals?.orders_count ?? 0} pedidos confirmados`}
                     icon={DollarSign}
                     accent="emerald"
                   />
                   <StatCard
                     title="Ticket Médio (Vendas)"
-                    value={salesTotals?.average_ticket_formatted ?? "R$ 0,00"}
+                    value={formatBRL(salesTotals?.average_ticket)}
                     hint="Média por pedido de venda confirmado"
                     icon={TrendingUp}
                     accent="primary"
@@ -124,14 +125,14 @@ export default function ReportsIndexPage() {
                 <>
                   <StatCard
                     title="Compras Confirmadas"
-                    value={purchasesTotals?.total_amount_formatted ?? "R$ 0,00"}
+                    value={formatBRL(purchasesTotals?.total_amount)}
                     hint={`${purchasesTotals?.orders_count ?? 0} ordens de compra confirmadas`}
                     icon={ShoppingCart}
                     accent="amber"
                   />
                   <StatCard
                     title="Ticket Médio (Compras)"
-                    value={purchasesTotals?.average_ticket_formatted ?? "R$ 0,00"}
+                    value={formatBRL(purchasesTotals?.average_ticket)}
                     hint="Média por ordem de compra confirmada"
                     icon={ShoppingBag}
                     accent="sky"

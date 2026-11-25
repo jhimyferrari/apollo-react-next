@@ -20,6 +20,7 @@ import { FormFieldError } from "@/components/common/form-field-error";
 import { AddressList } from "@/features/addresses/components/address-list";
 import { sellerSchema, type SellerFormData } from "../schemas/seller.schema";
 import { useCreateSeller, useUpdateSeller } from "../hooks/use-sellers";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { maskDocument, maskPhone, cleanDocument, onlyDigits } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
@@ -32,6 +33,7 @@ interface SellerFormProps {
 export function SellerForm({ initialData }: SellerFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialData);
+  const { can } = usePermissions();
 
   const createMutation = useCreateSeller();
   const updateMutation = useUpdateSeller();
@@ -120,10 +122,12 @@ export function SellerForm({ initialData }: SellerFormProps) {
           ended_at: formData.ended_at || null,
         });
 
-        if (res?.data?.id) {
+        if (res?.data?.id && can("seller.view") && can("seller.update")) {
           router.push(`/sellers/${res.data.id}`);
           return;
         }
+        router.push(can("seller.view") ? "/sellers" : "/");
+        return;
       }
 
       router.push("/sellers");

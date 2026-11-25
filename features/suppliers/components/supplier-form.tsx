@@ -20,6 +20,7 @@ import { FormFieldError } from "@/components/common/form-field-error";
 import { AddressList } from "@/features/addresses/components/address-list";
 import { supplierSchema, type SupplierFormData } from "../schemas/supplier.schema";
 import { useCreateSupplier, useUpdateSupplier } from "../hooks/use-suppliers";
+import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { maskDocument, maskPhone, cleanDocument, onlyDigits } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
@@ -32,6 +33,7 @@ interface SupplierFormProps {
 export function SupplierForm({ initialData }: SupplierFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialData);
+  const { can } = usePermissions();
 
   const createMutation = useCreateSupplier();
   const updateMutation = useUpdateSupplier();
@@ -110,10 +112,12 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
           phone: sanitizedPhone,
         });
 
-        if (res?.data?.id) {
+        if (res?.data?.id && can("supplier.view") && can("supplier.update")) {
           router.push(`/suppliers/${res.data.id}`);
           return;
         }
+        router.push(can("supplier.view") ? "/suppliers" : "/");
+        return;
       }
 
       router.push("/suppliers");

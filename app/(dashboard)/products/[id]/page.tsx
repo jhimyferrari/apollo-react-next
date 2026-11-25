@@ -10,18 +10,19 @@ import { useProduct } from "@/features/products/hooks/use-products";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function EditProductPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const { data, isLoading, isError, error, refetch } = useProduct(id);
+function EditProductContent({ id }: { id: string }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchedAfterMount,
+    isError,
+    error,
+    refetch,
+  } = useProduct(id);
   const product = data?.data;
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !isFetchedAfterMount)) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -62,21 +63,35 @@ export default function EditProductPage({
   }
 
   return (
-    <PermissionGuard
-      permission="product.update"
-      title="Edição Não Permitida"
-      description="Você não possui permissão para editar os dados deste produto."
-    >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Editar: ${product.name}`}
-          description={`Código #${product.number} • Atualize apenas os campos desejados`}
-        />
+    <div className="space-y-6">
+      <PageHeader
+        title={`Editar: ${product.name}`}
+        description={`Código #${product.number} • Atualize apenas os campos desejados`}
+      />
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-          <ProductForm initialData={product} />
-        </div>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+        <ProductForm initialData={product} />
       </div>
+    </div>
+  );
+}
+
+export default function EditProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
+    <PermissionGuard
+      permission={["product.view", "product.update"]}
+      mode="all"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para visualizar ou editar os dados deste produto."
+    >
+      <EditProductContent id={id} />
     </PermissionGuard>
   );
 }

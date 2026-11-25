@@ -10,18 +10,19 @@ import { useSupplier } from "@/features/suppliers/hooks/use-suppliers";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function EditSupplierPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const { data, isLoading, isError, error, refetch } = useSupplier(id);
+function EditSupplierContent({ id }: { id: string }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchedAfterMount,
+    isError,
+    error,
+    refetch,
+  } = useSupplier(id);
   const supplier = data?.data;
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !isFetchedAfterMount)) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -62,21 +63,35 @@ export default function EditSupplierPage({
   }
 
   return (
-    <PermissionGuard
-      permission="supplier.update"
-      title="Edição Não Permitida"
-      description="Você não possui permissão para editar os dados deste fornecedor."
-    >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Editar: ${supplier.legal_name}`}
-          description={`Código #${supplier.number} • ${supplier.trade_name}`}
-        />
+    <div className="space-y-6">
+      <PageHeader
+        title={`Editar: ${supplier.legal_name}`}
+        description={`Código #${supplier.number} • ${supplier.trade_name}`}
+      />
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-          <SupplierForm initialData={supplier} />
-        </div>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+        <SupplierForm initialData={supplier} />
       </div>
+    </div>
+  );
+}
+
+export default function EditSupplierPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
+    <PermissionGuard
+      permission={["supplier.view", "supplier.update"]}
+      mode="all"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para visualizar ou editar os dados deste fornecedor."
+    >
+      <EditSupplierContent id={id} />
     </PermissionGuard>
   );
 }

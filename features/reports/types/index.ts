@@ -1,4 +1,5 @@
 import type { PaginationLinks } from "@/lib/api/types";
+import type { MoneyLike } from "@/lib/formatters";
 
 /** Metadados de paginação enxutos retornados pelos endpoints de relatório. */
 export interface ReportPaginationMeta {
@@ -10,9 +11,14 @@ export interface ReportPaginationMeta {
   total: number;
 }
 
-export type ReportDateField = "confirmed_at" | "created_at";
+export type ReportDateField =
+  | "confirmed_at"
+  | "created_at"
+  | "paid_at"
+  | "refunded_at"
+  | "cancelled_at";
 export type ReportOrderDirection = "asc" | "desc";
-export type ReportOrderStatus = "draf" | "confirmed" | "cancelled";
+export type ReportOrderStatus = "draft" | "confirmed" | "cancelled" | "all";
 export type ReportPaymentStatus = "pending" | "paid" | "refunded" | "cancelled";
 
 /** Filtros aceitos pelos endpoints /v1/reports/*. */
@@ -36,19 +42,17 @@ export interface ReportFilters {
 
 export interface ReportBreakdownEntry {
   count: number;
-  total: string;
-  total_formatted: string;
+  total: MoneyLike;
 }
 
 export interface OrderSummaryTotals {
   orders_count: number;
-  total_amount: string;
-  total_amount_formatted: string;
-  average_ticket: string;
-  average_ticket_formatted: string;
+  total_amount: MoneyLike;
+  average_ticket: MoneyLike;
   total_items_quantity: string;
   by_status: Record<string, ReportBreakdownEntry>;
   by_payment_status: Record<string, ReportBreakdownEntry>;
+  pending_refund?: ReportBreakdownEntry;
 }
 
 export interface ReportPartnerRef {
@@ -63,10 +67,12 @@ interface ReportOrderRowBase {
   number: number;
   status: string;
   payment_status: string;
-  total: string;
-  total_formatted: string;
+  total: MoneyLike;
   items_count: number;
   confirmed_at: string | null;
+  paid_at: string | null;
+  refunded_at: string | null;
+  cancelled_at: string | null;
   created_at: string | null;
 }
 
@@ -92,8 +98,7 @@ export type PurchaseSummaryReport = ReportEnvelope<OrderSummaryTotals, PurchaseS
 export interface SalesByProductTotals {
   distinct_products_count: number;
   total_quantity: string;
-  total_amount: string;
-  total_amount_formatted: string;
+  total_amount: MoneyLike;
 }
 
 export interface SalesByProductRow {
@@ -103,10 +108,8 @@ export interface SalesByProductRow {
   product_unit: string;
   brand: { id: string; name: string } | null;
   quantity_sold: string;
-  total_amount: string;
-  total_amount_formatted: string;
-  average_unit_price: string;
-  average_unit_price_formatted: string;
+  total_amount: MoneyLike;
+  average_unit_price: MoneyLike;
   orders_count: number;
 }
 
@@ -115,8 +118,7 @@ export type SalesByProductReport = ReportEnvelope<SalesByProductTotals, SalesByP
 export interface SalesBySellerTotals {
   active_sellers_count: number;
   orders_count: number;
-  total_amount: string;
-  total_amount_formatted: string;
+  total_amount: MoneyLike;
 }
 
 export interface SalesBySellerRow {
@@ -126,10 +128,8 @@ export interface SalesBySellerRow {
   legal_name: string;
   document: string;
   orders_count: number;
-  total_amount: string;
-  total_amount_formatted: string;
-  average_ticket: string;
-  average_ticket_formatted: string;
+  total_amount: MoneyLike;
+  average_ticket: MoneyLike;
   percentage_of_total: number;
 }
 

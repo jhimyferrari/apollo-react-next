@@ -8,10 +8,10 @@ Este documento detalha **todas** as dependências instaladas no projeto (produç
 
 ### 1.1. Framework e Reatividade Base
 
-#### `next` (`^16.4.3`)
-* **O que faz**: Framework React completo para aplicações web com suporte a Server/Client Components, App Router e otimização de rotas e assets.
-* **Por que foi escolhida**: Padrão moderno corporativo e exigência da stack do projeto. Permite roteamento hierárquico, separação de layouts compartilhados (`(auth)` vs `(dashboard)`) e otimização de compilação via Turbopack.
-* **Onde é usada**: Estrutura de rotas em [`app/`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app), navegação (`useRouter`, `usePathname`, `<Link />`) e configuração em [`next.config.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/next.config.ts).
+#### `next` (`^16.4.6`)
+* **O que faz**: Framework React completo para aplicações web com suporte a Server/Client Components, App Router, Route Handlers e `proxy.ts`.
+* **Por que foi escolhida**: Padrão moderno corporativo e exigência da stack do projeto. Permite roteamento hierárquico, separação de layouts compartilhados (`(auth)` vs `(dashboard)`), execução do BFF como proxy reverso same-origin em `app/api/*`, validação SSR de sessão e otimização de compilação via Turbopack.
+* **Onde é usada**: Estrutura de rotas e BFF em [`app/`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/app), guarda de borda em [`proxy.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/proxy.ts), navegação (`useRouter`, `usePathname`, `<Link />`) e headers de segurança em [`next.config.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/next.config.ts).
 
 #### `react` e `react-dom` (`19.2.0`)
 * **O que faz**: Biblioteca central de interface declarativa e renderizador DOM.
@@ -103,7 +103,7 @@ Os seguintes componentes Radix foram adotados para garantir 100% de conformidade
 
 * **`typescript` (`^5`)**: Compilador de tipos estáticos para garantia de integridade em tempo de build.
 * **`@types/node` (`^20`)**, **`@types/react` (`^19`)**, **`@types/react-dom` (`^19`)**: Definições de tipagem para Node e React 19.
-* **`eslint` (`^9.39.5`)** e **`eslint-config-next` (`^16.4.3`)**: Análise estática de código e boas práticas Next.js.
+* **`eslint` (`^9.39.5`)** e **`eslint-config-next` (`^16.4.6`)**: Análise estática de código e boas práticas Next.js.
 * **`@tailwindcss/postcss` (`^4`)**: Plugin PostCSS oficial para integração do Tailwind CSS v4.
 * **`tw-animate-css` (`^1.4.0`)**: Classes de animação suaves para diálogos e transições.
 * **`husky` (`^9.1.7`)**, **`@commitlint/cli` (`^20.1.0`)**, **`@commitlint/config-conventional` (`^20.0.0`)**, **`cz-conventional-changelog` (`^3.0.1`)**: Padronização de mensagens de commit seguindo Conventional Commits.
@@ -113,6 +113,7 @@ Os seguintes componentes Radix foram adotados para garantir 100% de conformidade
 ## 3. O que NÃO foi adicionado (Decisões de Engenharia Conscientes)
 
 1. **Sem Axios**: O cliente HTTP foi construído sobre a `fetch` API nativa com interceptors tipados em [`lib/api/client.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/api/client.ts), economizando bundle e aproveitando o ecossistema nativo do Next.js.
+2. **Sem bibliotecas externas de Proxy, Sessão ou Criptografia no BFF (ex.: `http-proxy-middleware`, `iron-session`, `jose`)**: O proxy reverso same-origin, a validação anti-CSRF e a cifragem autenticada **AES-256-GCM** dos cookies `HttpOnly` foram implementados diretamente com `fetch` nativo, `next/headers` e `node:crypto` em [`lib/bff/`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/bff).
 2. **Sem bibliotecas externas de Máscara (ex.: `react-input-mask`)**: Máscaras foram implementadas em funções puras em [`lib/masks.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/masks.ts) sem incompatibilidade com React 19 e com suporte nativo ao novo padrão de CNPJ alfanumérico.
 3. **Sem bibliotecas pesadas de Moeda ou Data (ex.: `moment`, `date-fns`, `currency.js`)**: Utilização estrita dos padrões nativos `Intl.NumberFormat` e `Intl.DateTimeFormat` em [`lib/formatters.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/formatters.ts).
 4. **Sem dependência de API externa para consulta de Estados e Municípios IBGE**: Os 27 Estados (UFs) e 5.570 municípios brasileiros estão empacotados localmente em formato compacto em [`features/addresses/data/ibge-locations.json`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/addresses/data/ibge-locations.json) e indexados em memória por [`features/addresses/utils/locations.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/addresses/utils/locations.ts), garantindo resposta instantânea ($O(1)$), 100% de paridade com a base do backend e funcionamento imune a indisponibilidades de serviços externos.

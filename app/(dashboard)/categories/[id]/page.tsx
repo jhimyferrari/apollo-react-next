@@ -10,18 +10,19 @@ import { useCategory } from "@/features/categories/hooks/use-categories";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function EditCategoryPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const { data, isLoading, isError, error, refetch } = useCategory(id);
+function EditCategoryContent({ id }: { id: string }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchedAfterMount,
+    isError,
+    error,
+    refetch,
+  } = useCategory(id);
   const category = data?.data;
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !isFetchedAfterMount)) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -62,21 +63,35 @@ export default function EditCategoryPage({
   }
 
   return (
-    <PermissionGuard
-      permission="category.update"
-      title="Edição Não Permitida"
-      description="Você não possui permissão para editar os dados desta categoria."
-    >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Editar Categoria: ${category.name}`}
-          description={`Código #${category.number} • Atualize as informações desejadas`}
-        />
+    <div className="space-y-6">
+      <PageHeader
+        title={`Editar Categoria: ${category.name}`}
+        description={`Código #${category.number} • Atualize as informações desejadas`}
+      />
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-          <CategoryForm initialData={category} />
-        </div>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+        <CategoryForm initialData={category} />
       </div>
+    </div>
+  );
+}
+
+export default function EditCategoryPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
+    <PermissionGuard
+      permission={["category.view", "category.update"]}
+      mode="all"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para visualizar ou editar os dados desta categoria."
+    >
+      <EditCategoryContent id={id} />
     </PermissionGuard>
   );
 }

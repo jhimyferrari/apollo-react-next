@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import { clientService } from "@/features/clients/services/client.service";
 import { sellerService } from "@/features/sellers/services/seller.service";
 import { lookupService } from "@/features/lookups/services/lookup.service";
@@ -11,11 +12,16 @@ import type {
   PaymentStatus,
 } from "../types";
 
+export interface SalesOrderListParams extends BaseListParams {
+  status?: string;
+  payment_status?: string;
+}
+
 export const salesOrderService = {
-  list(params?: { page?: number; per_page?: number; status?: string }) {
+  list(params?: SalesOrderListParams) {
     return apiClient.get<PaginatedResponse<SalesOrderResource>>(
       "/v1/sales-orders",
-      params
+      cleanListParams(params)
     );
   },
 
@@ -38,7 +44,7 @@ export const salesOrderService = {
       try {
         const listRes = await apiClient.get<PaginatedResponse<SalesOrderResource>>(
           "/v1/sales-orders",
-          { page: 1 }
+          enriched.number != null ? { search: `#${enriched.number}`, page: 1 } : { page: 1 }
         );
         const match = listRes?.data?.find((item) => item.id === id);
         if (match) {

@@ -26,9 +26,9 @@ export function Can({
   children,
   fallback = null,
 }: CanProps) {
-  const { can } = usePermissions();
+  const { can, isInitialized } = usePermissions();
 
-  if (!can(permission, mode)) {
+  if (!isInitialized || !can(permission, mode)) {
     return <>{fallback}</>;
   }
 

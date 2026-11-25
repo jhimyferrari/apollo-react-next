@@ -24,7 +24,7 @@ import {
 import { DataTablePagination } from "@/components/common/data-table-pagination";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
-import { formatBRL, formatQuantity } from "@/lib/formatters";
+import { extractMoneyAmount, formatBRL, formatQuantity } from "@/lib/formatters";
 import { useSalesByProductReport } from "../hooks/use-reports";
 import { ReportFilterBar } from "./report-filter-bar";
 import {
@@ -59,7 +59,7 @@ export function SalesByProductReportView() {
 
   const rows = data?.data ?? [];
   const totals = data?.totals;
-  const globalTotalAmount = Number(totals?.total_amount ?? 0);
+  const globalTotalAmount = Number(extractMoneyAmount(totals?.total_amount, "0"));
 
   const avgRevenuePerProduct =
     totals && totals.distinct_products_count > 0
@@ -105,6 +105,7 @@ export function SalesByProductReportView() {
           "period",
           "date_field",
           "status",
+          "payment_status",
           "product",
           "category",
           "brand",
@@ -127,7 +128,7 @@ export function SalesByProductReportView() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard
                 title="Faturamento Total"
-                value={totals.total_amount_formatted}
+                value={formatBRL(totals.total_amount)}
                 hint="Soma consolidada dos itens vendidos"
                 icon={DollarSign}
                 accent="emerald"
@@ -224,7 +225,8 @@ export function SalesByProductReportView() {
                   <TableBody>
                     {rows.map((row, idx) => {
                       const rank = pageOffset + idx + 1;
-                      const rowAmount = Number(row.total_amount) || 0;
+                      const rowAmount =
+                        Number(extractMoneyAmount(row.total_amount, "0")) || 0;
                       const sharePct =
                         globalTotalAmount > 0
                           ? Math.min(
@@ -275,13 +277,13 @@ export function SalesByProductReportView() {
                             {formatQuantity(row.quantity_sold, row.product_unit)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground">
-                            {row.average_unit_price_formatted}
+                            {formatBRL(row.average_unit_price)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {row.orders_count}
                           </TableCell>
                           <TableCell className="text-right font-semibold tabular-nums text-foreground">
-                            {row.total_amount_formatted}
+                            {formatBRL(row.total_amount)}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">

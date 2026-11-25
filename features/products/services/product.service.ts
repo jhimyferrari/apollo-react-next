@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import { lookupService } from "@/features/lookups/services/lookup.service";
 import type { LookupParams } from "@/features/lookups/types";
 import type {
@@ -8,11 +9,17 @@ import type {
   UpdateProductRequest,
 } from "../types";
 
+export interface ProductListParams extends BaseListParams {
+  status?: string;
+  brand_id?: string;
+  category_id?: string;
+}
+
 export const productService = {
-  list(params?: { page?: number; per_page?: number }) {
+  list(params?: ProductListParams) {
     return apiClient.get<PaginatedResponse<ProductResource>>(
       "/v1/products",
-      params
+      cleanListParams(params)
     );
   },
 
@@ -30,7 +37,7 @@ export const productService = {
       try {
         const listRes = await apiClient.get<PaginatedResponse<ProductResource>>(
           "/v1/products",
-          { page: 1 }
+          product.number != null ? { search: `#${product.number}`, page: 1 } : { page: 1 }
         );
         const match = listRes?.data?.find((item) => item.id === id);
         if (match) {
