@@ -62,6 +62,38 @@ export default function DashboardHomePage() {
       color: "text-amber-500",
       permission: "client.create",
     },
+    {
+      title: "Nova Marca",
+      description: "Cadastrar marca para organizar os produtos do catálogo",
+      href: "/brands/new",
+      icon: Tags,
+      color: "text-rose-500",
+      permission: "brand.create",
+    },
+    {
+      title: "Nova Categoria",
+      description: "Cadastrar categoria para classificar produtos do catálogo",
+      href: "/categories/new",
+      icon: FolderTree,
+      color: "text-cyan-500",
+      permission: "category.create",
+    },
+    {
+      title: "Novo Vendedor",
+      description: "Cadastrar vendedor com documentos, vigência e endereços",
+      href: "/sellers/new",
+      icon: Briefcase,
+      color: "text-indigo-500",
+      permission: "seller.create",
+    },
+    {
+      title: "Novo Fornecedor",
+      description: "Cadastrar fornecedor com documentos e múltiplos endereços",
+      href: "/suppliers/new",
+      icon: Truck,
+      color: "text-orange-500",
+      permission: "supplier.create",
+    },
   ].filter((action) => can(action.permission));
 
   const modules = [
@@ -149,7 +181,7 @@ export default function DashboardHomePage() {
               return (
                 <Card
                   key={action.href}
-                  className="hover:border-foreground/20 transition-all hover:shadow-md bg-card/60"
+                  className="hover:border-foreground/20 transition-all hover:shadow-md bg-card/60 flex flex-col justify-between"
                 >
                   <CardHeader className="p-5 pb-3">
                     <div className="flex items-center justify-between">

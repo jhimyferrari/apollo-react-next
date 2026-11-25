@@ -4,10 +4,28 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, Building2, Lock, Mail } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  Building2,
+  Lock,
+  Mail,
+  KeyRound,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FormFieldError } from "@/components/common/form-field-error";
 import { loginSchema, type LoginFormData } from "../schemas/auth.schema";
 import { useAuth } from "../hooks/use-auth";
@@ -16,6 +34,7 @@ import { applyApiValidationErrors, parseApiError } from "@/lib/api/errors";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { login, isLoggingIn } = useAuth();
 
   const {
@@ -48,6 +67,7 @@ export function LoginForm() {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {/* Documento da Organização (CNPJ/CPF) */}
       <div className="space-y-2">
@@ -101,6 +121,14 @@ export function LoginForm() {
           <Label htmlFor="password" className="text-sm font-medium">
             Senha
           </Label>
+          <button
+            type="button"
+            onClick={() => setShowForgotPassword(true)}
+            disabled={isLoggingIn}
+            className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+          >
+            Esqueci minha senha
+          </button>
         </div>
         <div className="relative">
           <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -156,5 +184,60 @@ export function LoginForm() {
         </Link>
       </div>
     </form>
+
+    <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-primary" />
+            Recuperação de Senha
+          </DialogTitle>
+          <DialogDescription>
+            Veja como redefinir sua senha de acordo com o seu perfil de acesso:
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-1 text-sm">
+          <div className="rounded-lg border border-border bg-muted/40 p-3.5 space-y-1">
+            <p className="font-medium text-foreground flex items-center gap-2">
+              <User className="h-4 w-4 text-primary shrink-0" />
+              Usuário regular
+            </p>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Entre em contato com o administrador da sua organização para
+              solicitar a alteração da sua senha.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/40 p-3.5 space-y-1">
+            <p className="font-medium text-foreground flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+              Administrador da organização
+            </p>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Entre em contato com o suporte através do e-mail{" "}
+              <a
+                href="mailto:souzaferrarik@gmail.com"
+                className="font-medium text-primary hover:underline"
+              >
+                souzaferrarik@gmail.com
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowForgotPassword(false)}
+          >
+            Entendi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
