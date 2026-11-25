@@ -225,7 +225,7 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 
 | Tipo | Valor na API | Rótulo na UI | Cor do Badge |
 | :--- | :--- | :--- | :--- |
-| **Status do Pedido** | `"draft"` *(grafia literal da API)* | Rascunho | Neutro / Secundário |
+| **Status do Pedido** | `"draft"` | Rascunho | Neutro / Secundário |
 | **Status do Pedido** | `"confirmed"` | Confirmado | Verde / Sucesso |
 | **Status do Pedido** | `"cancelled"` | Cancelado | Vermelho / Destrutivo |
 | **Status de Pagamento** | `"pending"` | Pendente | Contorno / Neutro |
@@ -235,7 +235,7 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 
 ### 9.2. Criação de Pedido (`POST /v1/{sales|purchase}-orders`)
 * Todo pedido nasce no status `"draft"` (Rascunho).
-* O operador seleciona o parceiro comercial, statRascunhous de pagamento inicial (`pending` ou `paid`), observações (`notes`) e adiciona os itens (`product_id` e `quantity`).
+* O operador seleciona o parceiro comercial, status de pagamento inicial (`pending` ou `paid`), observações (`notes`) e adiciona os itens (`product_id` e `quantity`).
 * A interface calcula e exibe em tempo real o subtotal estimado de cada linha e o total geral do pedido apenas para pré-visualização visual; **`subtotal` não é enviado no payload** de criação nem de edição, pois os cálculos oficiais são feitos exclusivamente pelo backend.
 
 ### 9.3. Edição de Pedido em Rascunho (`PATCH /v1/{sales|purchase}-orders/{id}`)

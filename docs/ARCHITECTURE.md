@@ -356,9 +356,9 @@ Os módulos de **Pedidos de Venda (`sales-orders`)** e **Pedidos de Compra (`pur
 ```mermaid
 stateDiagram-v2
     [*] --> draft: Criação (POST /v1/*-orders)
-    draft--> draft: Edição de Cabeçalho e Diff de Itens (PATCH /v1/*-orders/{id})
-    draft--> confirmed : Confirmar Pedido (PATCH /v1/*-orders/{id}/confirm)
-    draft--> cancelled : Cancelar Rascunho (PATCH /v1/*-orders/{id}/cancel)
+    draft --> draft: Edição de Cabeçalho e Diff de Itens (PATCH /v1/*-orders/{id})
+    draft --> confirmed : Confirmar Pedido (PATCH /v1/*-orders/{id}/confirm)
+    draft --> cancelled : Cancelar Rascunho (PATCH /v1/*-orders/{id}/cancel)
     confirmed --> cancelled : Cancelar Pedido Confirmado (Estorna Estoque)
     confirmed --> draft: Reabrir Pedido (Cancela original + Cria novo Rascunho vinculado)
     cancelled --> draft: Reabrir Pedido (Cria novo Rascunho vinculado ao cancelado)
@@ -366,8 +366,8 @@ stateDiagram-v2
 
 ### 8.1. Particularidades Técnicas Importantes dos Pedidos
 
-1. **Valor Literal do Status de Rascunho (`"draft"`)**:
-   * Por contrato do backend Laravel (`OrderStatus::Draft = 'draft'`), o status de rascunho no JSON é grafado literalmente como `"draft"`. Todos os tipos TypeScript, filtros e badges do frontend respeitam essa constante exata.
+1. **Status de Rascunho (`"draft"`)**:
+   * Alinhado ao enum do backend Laravel (`OrderStatus::Draft = 'draft'`), utilizado em tipos TypeScript, filtros e badges do frontend.
 2. **Operações Delta em Itens na Edição de Rascunho (`items.to_add`, `to_update`, `to_remove`)**:
    * Enquanto um pedido está em rascunho (`draft`), sua edição (`PATCH /v1/{orders}/{id}`) não sobrescreve cegamente a lista de itens. O formulário compara os itens originais (identificados pelo seu número sequencial `number`) com os itens atuais e monta o objeto delta:
      * `to_add`: Novos produtos adicionados ao pedido (`{ product_id, quantity }`).
