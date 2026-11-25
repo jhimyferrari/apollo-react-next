@@ -55,12 +55,23 @@ export function getAuthTokenFromRequest(request: NextRequest): string | null {
   return decryptCookieValue(raw);
 }
 
-export async function getAuthTokenFromServerCookies(): Promise<string | null> {
+export async function getAuthTokenStateFromServerCookies(): Promise<{
+  hasCookie: boolean;
+  token: string | null;
+}> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(getTokenCookieName())?.value;
   if (!raw) {
-    return null;
+    return { hasCookie: false, token: null };
   }
 
-  return decryptCookieValue(raw);
+  return {
+    hasCookie: true,
+    token: decryptCookieValue(raw),
+  };
+}
+
+export async function getAuthTokenFromServerCookies(): Promise<string | null> {
+  const { token } = await getAuthTokenStateFromServerCookies();
+  return token;
 }

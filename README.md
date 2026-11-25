@@ -107,7 +107,7 @@ Para aprofundar na engenharia, regras de negócio e decisões de design do proje
   * Atualizações parciais determinísticas com `calculateDiff` (`PATCH`)
   * Arquitetura de permissões RBAC (`usePermissions`, `<Can>`, `<PermissionGuard>`)
   * Gestão de endereços polimórficos e seleção UF $\rightarrow$ Cidade com código IBGE
-  * Máquina de estados de Pedidos de Venda e Compra (`draf`, `confirmed`, `cancelled`, `reopen` e `outdated_prices`) e fluxo dedicado de status de pagamento (`pending`, `paid`, `refunded`, `cancelled` via `PATCH /v1/{orders}/{id}/payment-status`)
+  * Máquina de estados de Pedidos de Venda e Compra (`draft`, `confirmed`, `cancelled`, `reopen` e `outdated_prices`) e fluxo dedicado de status de pagamento (`pending`, `paid`, `refunded`, `cancelled` via `PATCH /v1/{orders}/{id}/payment-status`)
 * **[docs/FEATURES_AND_WORKFLOWS.md](docs/FEATURES_AND_WORKFLOWS.md)**:
   * Guia funcional e técnico detalhado de todos os 11 módulos de domínio, Dashboard, Lookups (`/v1/lookups/*`) e Relatórios Gerenciais (`/reports`)
   * Tabelas de rotas, permissões exigidas, validações de formulário, alteração de senha própria (`PATCH /v1/users/me/password`) e de terceiros, e payloads

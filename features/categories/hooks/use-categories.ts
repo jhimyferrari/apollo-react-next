@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { categoryService } from "../services/category.service";
+import { categoryService, type CategoryListParams } from "../services/category.service";
 import { parseApiError } from "@/lib/api/errors";
 import { useCategoryLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreCategoryRequest, UpdateCategoryRequest } from "../types";
 
 export { useCategoryLookup };
 
-export function useCategories(page = 1) {
+export function useCategories(params?: CategoryListParams) {
   return useQuery({
-    queryKey: ["categories", page],
-    queryFn: () => categoryService.list({ page }),
+    queryKey: ["categories", params ?? {}],
+    queryFn: () => categoryService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -54,9 +55,15 @@ export function useUpdateCategory() {
       id: string;
       data: Partial<UpdateCategoryRequest>;
     }) => categoryService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      queryClient.invalidateQueries({ queryKey: ["lookups", "categories"] });
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["categories", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["categories"] }),
+        queryClient.invalidateQueries({ queryKey: ["lookups", "categories"] }),
+      ]);
       toast.success("Categoria atualizada com sucesso!");
     },
     onError: (err) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -20,17 +20,38 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTablePagination } from "@/components/common/data-table-pagination";
+import {
+  DataTableToolbar,
+  SortableTableHead,
+} from "@/components/common/data-table-toolbar";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { formatDate } from "@/lib/formatters";
+import { toggleSortState, type SortState } from "@/lib/table-utils";
 import { useCategories, useDeleteCategory } from "../hooks/use-categories";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, Edit, Trash2, Plus, AlertCircle, FolderTree } from "lucide-react";
 import type { CategoryResource } from "../types";
 
+type CategorySortKey = "number" | "name" | "created_at";
+
+const CATEGORY_SORT_OPTIONS: Array<{ value: CategorySortKey; label: string }> = [
+  { value: "number", label: "Código (#)" },
+  { value: "name", label: "Nome da Categoria" },
+  { value: "created_at", label: "Criado em" },
+];
+
 export function CategoryTable() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [sortState, setSortState] = useState<SortState<CategorySortKey> | null>(
+    null
+  );
+  const [appliedFilters, setAppliedFilters] = useState<{
+    search: string;
+    sortState: SortState<CategorySortKey> | null;
+  }>({ search: "", sortState: null });
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryResource | null>(null);
 
   const { can } = usePermissions();
@@ -40,17 +61,62 @@ export function CategoryTable() {
   const canDelete = can("category.delete");
   const hasActions = canEdit || canDelete;
 
-  const { data, isLoading, isError, error, refetch } = useCategories(page);
+  const { data, isLoading, isFetching, isError, error, refetch } = useCategories({
+    page,
+    search: appliedFilters.search,
+    sort_by: appliedFilters.sortState?.key,
+    sort_direction: appliedFilters.sortState?.direction,
+  });
   const deleteMutation = useDeleteCategory();
 
-  const categories = data?.data || [];
+  const categories = useMemo(() => data?.data || [], [data]);
   const meta = data?.meta;
+
+  const hasDraftFilters = search.trim() !== "" || sortState !== null;
+  const hasAppliedFilters =
+    appliedFilters.search.trim() !== "" || appliedFilters.sortState !== null;
+  const hasActiveFilters = hasDraftFilters || hasAppliedFilters;
+
+  const handleApplyFilters = () => {
+    const isSame =
+      appliedFilters.search === search &&
+      appliedFilters.sortState?.key === sortState?.key &&
+      appliedFilters.sortState?.direction === sortState?.direction;
+
+    if (isSame && page === 1) {
+      void refetch();
+      return;
+    }
+
+    setAppliedFilters({ search, sortState });
+    setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setSearch("");
+    setSortState(null);
+    setAppliedFilters({ search: "", sortState: null });
+    setPage(1);
+  };
+
+  const handleHeaderSort = (key: string) => {
+    const nextSort = toggleSortState(
+      appliedFilters.sortState,
+      key as CategorySortKey
+    );
+    setSortState(nextSort);
+    setAppliedFilters((prev) => ({ ...prev, sortState: nextSort }));
+    setPage(1);
+  };
 
   const handleDeleteConfirm = async () => {
     if (!categoryToDelete) return;
     try {
       await deleteMutation.mutateAsync(categoryToDelete.id);
       setCategoryToDelete(null);
+      if (categories.length === 1 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -91,7 +157,7 @@ export function CategoryTable() {
     );
   }
 
-  if (categories.length === 0) {
+  if (categories.length === 0 && !hasAppliedFilters && page === 1 && (meta?.total ?? 0) === 0) {
     return (
       <EmptyState
         icon={FolderTree}
@@ -113,21 +179,102 @@ export function CategoryTable() {
 
   return (
     <div className="space-y-4">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por nome, código ou descrição..."
+        sortOptions={CATEGORY_SORT_OPTIONS}
+        sortState={sortState}
+        onSortKeyChange={(key) =>
+          setSortState(
+            key ? { key: key as CategorySortKey, direction: sortState?.direction ?? "asc" } : null
+          )
+        }
+        onSortDirectionToggle={() =>
+          setSortState((prev) =>
+            prev
+              ? { ...prev, direction: prev.direction === "asc" ? "desc" : "asc" }
+              : null
+          )
+        }
+        onSubmit={handleApplyFilters}
+        onClearAll={clearAllFilters}
+        hasActiveFilters={hasActiveFilters}
+        isFetching={isFetching && !isLoading}
+        filteredCount={categories.length}
+        totalCount={meta?.total ?? categories.length}
+      />
+
       <div className="rounded-md border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">#</TableHead>
-              <TableHead>Nome da Categoria</TableHead>
+              <SortableTableHead
+                label="#"
+                sortKey="number"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-16"
+              />
+              <SortableTableHead
+                label="Nome da Categoria"
+                sortKey="name"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+              />
               <TableHead>Descrição</TableHead>
-              <TableHead className="w-36">Criado em</TableHead>
+              <SortableTableHead
+                label="Criado em"
+                sortKey="created_at"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-36"
+              />
               {hasActions && (
                 <TableHead className="w-16 text-center">Ações</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.map((category) => (
+            {categories.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={hasActions ? 5 : 4}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  {page > 1 && meta && meta.total > 0 ? (
+                    <>
+                      <p>Nenhum registro nesta página.</p>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setPage(Math.max(1, meta.last_page))}
+                        className="mt-1"
+                      >
+                        Ir para a última página
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Nenhuma categoria encontrada com os filtros atuais.</p>
+                      {hasAppliedFilters && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          onClick={clearAllFilters}
+                          className="mt-1"
+                        >
+                          Limpar filtros
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              categories.map((category) => (
               <TableRow key={category.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   #{category.number}
@@ -178,7 +325,8 @@ export function CategoryTable() {
                   </TableCell>
                 )}
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>

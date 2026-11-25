@@ -1,11 +1,12 @@
 import type { SessionUser } from "@/lib/auth/session";
 import { getApiInternalUrl } from "./config";
-import { getAuthTokenFromServerCookies } from "./cookies";
+import { getAuthTokenStateFromServerCookies } from "./cookies";
 
 export interface ServerSessionResult {
   authenticated: boolean;
   user: SessionUser | null;
   invalidToken: boolean;
+  transientError?: boolean;
 }
 
 export function sanitizeSessionUser(raw: unknown): SessionUser | null {
@@ -61,9 +62,13 @@ export function sanitizeSessionUser(raw: unknown): SessionUser | null {
 }
 
 export async function fetchServerSession(): Promise<ServerSessionResult> {
-  const token = await getAuthTokenFromServerCookies();
-  if (!token) {
+  const { hasCookie, token } = await getAuthTokenStateFromServerCookies();
+  if (!hasCookie) {
     return { authenticated: false, user: null, invalidToken: false };
+  }
+
+  if (!token) {
+    return { authenticated: false, user: null, invalidToken: true };
   }
 
   try {
@@ -82,7 +87,12 @@ export async function fetchServerSession(): Promise<ServerSessionResult> {
     }
 
     if (!response.ok) {
-      return { authenticated: false, user: null, invalidToken: false };
+      return {
+        authenticated: false,
+        user: null,
+        invalidToken: false,
+        transientError: true,
+      };
     }
 
     const payload = (await response.json()) as Record<string, unknown>;
@@ -90,11 +100,21 @@ export async function fetchServerSession(): Promise<ServerSessionResult> {
     const user = sanitizeSessionUser(rawUser);
 
     if (!user) {
-      return { authenticated: false, user: null, invalidToken: false };
+      return {
+        authenticated: false,
+        user: null,
+        invalidToken: false,
+        transientError: true,
+      };
     }
 
     return { authenticated: true, user, invalidToken: false };
   } catch {
-    return { authenticated: false, user: null, invalidToken: false };
+    return {
+      authenticated: false,
+      user: null,
+      invalidToken: false,
+      transientError: true,
+    };
   }
 }

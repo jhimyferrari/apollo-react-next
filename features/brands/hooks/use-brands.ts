@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { brandService } from "../services/brand.service";
+import { brandService, type BrandListParams } from "../services/brand.service";
 import { parseApiError } from "@/lib/api/errors";
 import { useBrandLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreBrandRequest, UpdateBrandRequest } from "../types";
 
 export { useBrandLookup };
 
-export function useBrands(page = 1) {
+export function useBrands(params?: BrandListParams) {
   return useQuery({
-    queryKey: ["brands", page],
-    queryFn: () => brandService.list({ page }),
+    queryKey: ["brands", params ?? {}],
+    queryFn: () => brandService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -49,9 +50,15 @@ export function useUpdateBrand() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<UpdateBrandRequest> }) =>
       brandService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["brands"] });
-      queryClient.invalidateQueries({ queryKey: ["lookups", "brands"] });
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["brands", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["brands"] }),
+        queryClient.invalidateQueries({ queryKey: ["lookups", "brands"] }),
+      ]);
       toast.success("Marca atualizada com sucesso!");
     },
     onError: (err) => {

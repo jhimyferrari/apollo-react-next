@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authService } from "@/features/auth/services/auth.service";
@@ -9,7 +15,7 @@ import {
   clearLegacyClientAuthStorage,
   type SessionUser,
 } from "@/lib/auth/session";
-import { subscribeAuthEvents } from "@/lib/auth/sync";
+import { broadcastAuthEvent, subscribeAuthEvents } from "@/lib/auth/sync";
 
 export const AUTH_SESSION_QUERY_KEY = ["auth", "session"] as const;
 
@@ -42,6 +48,7 @@ export function AuthProvider({
   }, []);
 
   const hasInitialUser = initialUser !== undefined;
+  const hasHandledExpiryRef = useRef(false);
 
   const { data, isFetched } = useQuery<AuthSessionResponse>({
     queryKey: AUTH_SESSION_QUERY_KEY,
@@ -98,6 +105,28 @@ export function AuthProvider({
       }
     });
   }, [clearSessionState, queryClient, router]);
+
+  useEffect(() => {
+    if (autoFetch && isFetched && data && data.authenticated === false) {
+      if (!hasHandledExpiryRef.current) {
+        hasHandledExpiryRef.current = true;
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== "auth",
+        });
+        broadcastAuthEvent("logout");
+
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/login") &&
+          !window.location.pathname.startsWith("/register-organization")
+        ) {
+          router.replace("/login");
+        }
+      }
+    } else if (data?.authenticated) {
+      hasHandledExpiryRef.current = false;
+    }
+  }, [autoFetch, isFetched, data, queryClient, router]);
 
   const user = data?.authenticated ? (data.user ?? null) : null;
   const isAuthenticated = Boolean(data?.authenticated && user);

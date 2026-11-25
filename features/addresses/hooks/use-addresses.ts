@@ -1,16 +1,21 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { addressService, type AddressOwnerType } from "../services/address.service";
 import { parseApiError } from "@/lib/api/errors";
 import type { StoreAddressRequest, UpdateAddressRequest } from "../types";
 
-export function useAddresses(ownerType: AddressOwnerType, ownerId?: string) {
+export function useAddresses(
+  ownerType: AddressOwnerType,
+  ownerId?: string,
+  page = 1
+) {
   return useQuery({
-    queryKey: ["addresses", ownerType, ownerId],
-    queryFn: () => addressService.list(ownerType, ownerId!),
+    queryKey: ["addresses", ownerType, ownerId, page],
+    queryFn: () => addressService.list(ownerType, ownerId!, page),
     enabled: Boolean(ownerId),
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -6,7 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
 } from "react";
 
 export const FONT_SCALE_STEPS = [90, 100, 110, 120, 130, 140] as const;
@@ -19,6 +19,11 @@ interface AccessibilityPrefs {
   highContrast: boolean;
   fontScale: FontScale;
 }
+
+const DEFAULT_PREFS: AccessibilityPrefs = {
+  highContrast: false,
+  fontScale: DEFAULT_FONT_SCALE,
+};
 
 interface AccessibilityContextValue {
   highContrast: boolean;
@@ -46,15 +51,11 @@ function isValidFontScale(val: unknown): val is FontScale {
   );
 }
 
-function readStoredPrefs(): AccessibilityPrefs {
-  if (typeof window === "undefined") {
-    return { highContrast: false, fontScale: DEFAULT_FONT_SCALE };
+function parsePrefsRaw(raw: string | null): AccessibilityPrefs {
+  if (!raw) {
+    return DEFAULT_PREFS;
   }
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { highContrast: false, fontScale: DEFAULT_FONT_SCALE };
-    }
     const parsed = JSON.parse(raw) as Partial<AccessibilityPrefs>;
     return {
       highContrast: Boolean(parsed.highContrast),
@@ -63,8 +64,71 @@ function readStoredPrefs(): AccessibilityPrefs {
         : DEFAULT_FONT_SCALE,
     };
   } catch {
-    return { highContrast: false, fontScale: DEFAULT_FONT_SCALE };
+    return DEFAULT_PREFS;
   }
+}
+
+let cachedRaw: string | null = null;
+let cachedPrefs: AccessibilityPrefs = DEFAULT_PREFS;
+const listeners = new Set<() => void>();
+
+function getServerPrefsSnapshot(): AccessibilityPrefs {
+  return DEFAULT_PREFS;
+}
+
+function getClientPrefsSnapshot(): AccessibilityPrefs {
+  if (typeof window === "undefined") {
+    return DEFAULT_PREFS;
+  }
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw === cachedRaw) {
+      return cachedPrefs;
+    }
+    cachedRaw = raw;
+    cachedPrefs = parsePrefsRaw(raw);
+    return cachedPrefs;
+  } catch {
+    return cachedPrefs;
+  }
+}
+
+function subscribePrefs(listener: () => void): () => void {
+  listeners.add(listener);
+  if (typeof window === "undefined") {
+    return () => {
+      listeners.delete(listener);
+    };
+  }
+  const handleStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY || e.key === null) {
+      listener();
+    }
+  };
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function updateStoredPrefs(
+  updater: (prev: AccessibilityPrefs) => AccessibilityPrefs
+) {
+  const prev = getClientPrefsSnapshot();
+  const next = updater(prev);
+  const serialized = JSON.stringify(next);
+  cachedRaw = serialized;
+  cachedPrefs = next;
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, serialized);
+    }
+  } catch {
+    // Ignora erro de quota/storage bloqueado
+  }
+  applyPrefsToDocument(next);
+  listeners.forEach((listener) => listener());
 }
 
 function applyPrefsToDocument(prefs: AccessibilityPrefs) {
@@ -92,34 +156,31 @@ export function AccessibilityProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [prefs, setPrefs] = useState<AccessibilityPrefs>(() =>
-    readStoredPrefs()
+  const prefs = useSyncExternalStore(
+    subscribePrefs,
+    getClientPrefsSnapshot,
+    getServerPrefsSnapshot
   );
 
-  // Sincroniza preferências com o DOM e localStorage
+  // Sincroniza preferências com o DOM após montagem e alterações
   useEffect(() => {
     applyPrefsToDocument(prefs);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-    } catch {
-      // Ignora erro de quota/storage bloqueado
-    }
   }, [prefs]);
 
   const toggleHighContrast = useCallback(() => {
-    setPrefs((prev) => ({ ...prev, highContrast: !prev.highContrast }));
+    updateStoredPrefs((prev) => ({ ...prev, highContrast: !prev.highContrast }));
   }, []);
 
   const setHighContrast = useCallback((enabled: boolean) => {
-    setPrefs((prev) => ({ ...prev, highContrast: enabled }));
+    updateStoredPrefs((prev) => ({ ...prev, highContrast: enabled }));
   }, []);
 
   const setFontScale = useCallback((scale: FontScale) => {
-    setPrefs((prev) => ({ ...prev, fontScale: scale }));
+    updateStoredPrefs((prev) => ({ ...prev, fontScale: scale }));
   }, []);
 
   const increaseFont = useCallback(() => {
-    setPrefs((prev) => {
+    updateStoredPrefs((prev) => {
       const currentIndex = FONT_SCALE_STEPS.indexOf(prev.fontScale);
       const nextIndex = Math.min(
         currentIndex + 1,
@@ -130,7 +191,7 @@ export function AccessibilityProvider({
   }, []);
 
   const decreaseFont = useCallback(() => {
-    setPrefs((prev) => {
+    updateStoredPrefs((prev) => {
       const currentIndex = FONT_SCALE_STEPS.indexOf(prev.fontScale);
       const prevIndex = Math.max(currentIndex - 1, 0);
       return { ...prev, fontScale: FONT_SCALE_STEPS[prevIndex] };
@@ -138,11 +199,11 @@ export function AccessibilityProvider({
   }, []);
 
   const resetFont = useCallback(() => {
-    setPrefs((prev) => ({ ...prev, fontScale: DEFAULT_FONT_SCALE }));
+    updateStoredPrefs((prev) => ({ ...prev, fontScale: DEFAULT_FONT_SCALE }));
   }, []);
 
   const resetAll = useCallback(() => {
-    setPrefs({ highContrast: false, fontScale: DEFAULT_FONT_SCALE });
+    updateStoredPrefs(() => DEFAULT_PREFS);
   }, []);
 
   // Atalhos globais de teclado para acessibilidade:

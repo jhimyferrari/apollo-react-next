@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,12 @@ import {
   useUpdateProduct,
 } from "../hooks/use-products";
 import { useBrandLookup, useCategoryLookup } from "@/features/lookups/hooks/use-lookups";
+import { LookupCodeSelect } from "@/features/lookups/components/lookup-code-select";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import type {
+  BrandLookupResource,
+  CategoryLookupResource,
+} from "@/features/lookups/types";
 import { maskNCM, onlyDigits, maskPrice, maskStock } from "@/lib/masks";
 import { calculateDiff } from "@/lib/diff";
 import { applyApiValidationErrors, parseApiError } from "@/lib/api/errors";
@@ -54,7 +60,22 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const { data: categoriesData } = useCategoryLookup();
 
   const brands = brandsData?.data || [];
-  const categories = categoriesData?.data || [];
+  const categories = useMemo(
+    () => categoriesData?.data || [],
+    [categoriesData]
+  );
+
+  const [categoryCodeInput, setCategoryCodeInput] = useState("");
+  const [isSearchingCategory, setIsSearchingCategory] = useState(false);
+  const [categoryCodeError, setCategoryCodeError] = useState<string | null>(null);
+  const [extraCategories, setExtraCategories] = useState<CategoryLookupResource[]>([]);
+  const categoryRequestIdRef = useRef(0);
+
+  const mergedCategories = useMemo(() => {
+    const existingIds = new Set(categories.map((c) => c.id));
+    const extras = extraCategories.filter((c) => !existingIds.has(c.id));
+    return extras.length > 0 ? [...categories, ...extras] : categories;
+  }, [categories, extraCategories]);
 
   // Formata valores iniciais caso venham de objeto
   const defaultCostPrice = useMemo(() => {
@@ -248,6 +269,57 @@ export function ProductForm({ initialData }: ProductFormProps) {
       current.add(catId);
     }
     setValue("category_ids", Array.from(current), { shouldValidate: true });
+  };
+
+  const handleAddCategoryByCode = async () => {
+    const trimmed = categoryCodeInput.trim();
+    if (!trimmed) return;
+
+    const num = Number(trimmed);
+    if (!Number.isSafeInteger(num) || num < 1) {
+      setCategoryCodeError("Código inválido para categoria.");
+      return;
+    }
+
+    const reqId = ++categoryRequestIdRef.current;
+    setIsSearchingCategory(true);
+    setCategoryCodeError(null);
+
+    try {
+      const res = await lookupService.categoryByNumber(num);
+      if (reqId !== categoryRequestIdRef.current) return;
+
+      const found = res?.data;
+      if (!found) {
+        setCategoryCodeError(`Código ${num} não encontrado.`);
+        return;
+      }
+
+      setExtraCategories((prev) =>
+        prev.some((c) => c.id === found.id) ? prev : [...prev, found]
+      );
+
+      if (!selectedCategories.includes(found.id)) {
+        setValue("category_ids", [...selectedCategories, found.id], {
+          shouldValidate: true,
+        });
+      }
+
+      setCategoryCodeInput("");
+      setCategoryCodeError(null);
+    } catch (err) {
+      if (reqId !== categoryRequestIdRef.current) return;
+      const parsed = parseApiError(err);
+      if (parsed.statusCode === 404) {
+        setCategoryCodeError(`Código ${num} não encontrado.`);
+      } else {
+        setCategoryCodeError(parsed.message);
+      }
+    } finally {
+      if (reqId === categoryRequestIdRef.current) {
+        setIsSearchingCategory(false);
+      }
+    }
   };
 
   return (
@@ -488,23 +560,31 @@ export function ProductForm({ initialData }: ProductFormProps) {
             control={control}
             name="brand_id"
             render={({ field }) => (
-              <Select
-                value={field.value || "none"}
-                onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
-                disabled={isLoadingBrands || isSubmitting}
-              >
-                <SelectTrigger id="brand_id">
-                  <SelectValue placeholder="Selecione uma marca..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma marca vinculada</SelectItem>
-                  {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      #{b.number} - {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <LookupCodeSelect<BrandLookupResource>
+                id="brand_id"
+                value={field.value || ""}
+                onValueChange={(val) => field.onChange(val)}
+                options={brands}
+                selectedFallback={
+                  initialData?.brand
+                    ? {
+                        id: initialData.brand.id,
+                        number: initialData.brand.number,
+                        name: initialData.brand.name,
+                      }
+                    : null
+                }
+                lookupByNumber={(num) => lookupService.brandByNumber(num)}
+                renderOptionLabel={(b) => `${b.number} - ${b.name}`}
+                placeholder="Selecione uma marca..."
+                emptyOption={{
+                  value: "none",
+                  label: "Nenhuma marca vinculada",
+                }}
+                resourceLabel="Marca"
+                disabled={isSubmitting}
+                isLoadingOptions={isLoadingBrands}
+              />
             )}
           />
           <FormFieldError error={errors.brand_id} />
@@ -512,14 +592,77 @@ export function ProductForm({ initialData }: ProductFormProps) {
 
         {/* Categorias */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Categorias</Label>
-          {categories.length === 0 ? (
+          <Label htmlFor="category_code_input" className="text-sm font-medium">
+            Categorias
+          </Label>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Input
+                  id="category_code_input"
+                  type="text"
+                  inputMode="numeric"
+                  value={categoryCodeInput}
+                  onChange={(e) => {
+                    setCategoryCodeInput(e.target.value.replace(/\D/g, ""));
+                    setCategoryCodeError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleAddCategoryByCode();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      categoryRequestIdRef.current += 1;
+                      setIsSearchingCategory(false);
+                      setCategoryCodeInput("");
+                      setCategoryCodeError(null);
+                    }
+                  }}
+                  placeholder="Cód."
+                  aria-label="Código da categoria"
+                  aria-invalid={Boolean(categoryCodeError)}
+                  disabled={isSubmitting || isSearchingCategory}
+                  className={`w-24 font-mono text-sm ${
+                    isSearchingCategory ? "pr-7" : ""
+                  } ${
+                    categoryCodeError
+                      ? "border-destructive focus-visible:ring-destructive"
+                      : ""
+                  }`}
+                />
+                {isSearchingCategory && (
+                  <Loader2
+                    className="h-3.5 w-3.5 animate-spin text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={
+                  isSubmitting ||
+                  isSearchingCategory ||
+                  categoryCodeInput.trim() === ""
+                }
+                onClick={() => void handleAddCategoryByCode()}
+              >
+                Adicionar por código
+              </Button>
+            </div>
+            {categoryCodeError && (
+              <p className="text-xs text-destructive">{categoryCodeError}</p>
+            )}
+          </div>
+          {mergedCategories.length === 0 ? (
             <p className="text-xs text-muted-foreground py-2 italic">
               Nenhuma categoria cadastrada.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2 pt-1">
-              {categories.map((cat) => {
+              {mergedCategories.map((cat) => {
                 const isSelected = selectedCategories.includes(cat.id);
                 return (
                   <button
@@ -532,7 +675,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
                         : "bg-card text-muted-foreground border-border hover:bg-accent"
                     }`}
                   >
-                    {cat.name}
+                    {cat.number} - {cat.name}
                   </button>
                 );
               })}

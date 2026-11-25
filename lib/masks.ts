@@ -98,11 +98,16 @@ export function maskNCM(value: string): string {
 export function maskDecimal(value: string | null | undefined, maxDecimals?: number): string {
   if (!value) return "";
 
-  // Converte ponto em vírgula para suportar teclados numéricos
-  const normalized = value.replace(/\./g, ",");
+  // Mantém apenas dígitos, pontos e vírgulas
+  const raw = value.replace(/[^\d.,]/g, "");
 
-  // Remove qualquer caractere que não seja dígito ou vírgula
-  const cleaned = normalized.replace(/[^\d,]/g, "");
+  // Se houver vírgula ou múltiplos pontos (ex.: "1.250,50" ou "1.250.000"),
+  // trata os pontos como separadores de milhar pt-BR; caso contrário, ponto único vira vírgula decimal.
+  const dotCount = raw.match(/\./g)?.length ?? 0;
+  const cleaned =
+    raw.includes(",") || dotCount > 1
+      ? raw.replace(/\./g, "")
+      : raw.replace(/\./g, ",");
 
   // Separa pela primeira vírgula encontrada
   const firstCommaIndex = cleaned.indexOf(",");

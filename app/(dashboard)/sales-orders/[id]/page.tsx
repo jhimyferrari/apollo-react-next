@@ -10,14 +10,7 @@ import { useSalesOrder } from "@/features/sales-orders/hooks/use-sales-orders";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function ViewSalesOrderPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
+function ViewSalesOrderContent({ id }: { id: string }) {
   const { data, isLoading, isError, error, refetch } = useSalesOrder(id);
   const order = data?.data;
 
@@ -62,19 +55,32 @@ export default function ViewSalesOrderPage({
   }
 
   return (
+    <div className="space-y-6">
+      <PageHeader
+        title={`Pedido de Venda #${order.number}`}
+        description={`Cliente: ${order.client?.legal_name || "N/A"}`}
+      />
+
+      <SalesOrderDetails key={order.id} order={order} />
+    </div>
+  );
+}
+
+export default function ViewSalesOrderPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
     <PermissionGuard
       permission="sales-order.view"
       title="Acesso Restrito"
       description="Você não possui permissão para visualizar os detalhes deste pedido de venda."
     >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Pedido de Venda #${order.number}`}
-          description={`Cliente: ${order.client?.legal_name || "N/A"}`}
-        />
-
-        <SalesOrderDetails order={order} />
-      </div>
+      <ViewSalesOrderContent id={id} />
     </PermissionGuard>
   );
 }

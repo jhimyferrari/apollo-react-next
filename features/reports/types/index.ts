@@ -18,7 +18,7 @@ export type ReportDateField =
   | "refunded_at"
   | "cancelled_at";
 export type ReportOrderDirection = "asc" | "desc";
-export type ReportOrderStatus = "draf" | "confirmed" | "cancelled" | "all";
+export type ReportOrderStatus = "draft" | "confirmed" | "cancelled" | "all";
 export type ReportPaymentStatus = "pending" | "paid" | "refunded" | "cancelled";
 
 /** Filtros aceitos pelos endpoints /v1/reports/*. */

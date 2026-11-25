@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -20,17 +20,36 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTablePagination } from "@/components/common/data-table-pagination";
+import {
+  DataTableToolbar,
+  SortableTableHead,
+} from "@/components/common/data-table-toolbar";
 import { TableSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { formatDate } from "@/lib/formatters";
+import { toggleSortState, type SortState } from "@/lib/table-utils";
 import { useBrands, useDeleteBrand } from "../hooks/use-brands";
 import { usePermissions } from "@/features/auth/hooks/use-permissions";
 import { MoreHorizontal, Edit, Trash2, Plus, AlertCircle, Tags } from "lucide-react";
 import type { BrandResource } from "../types";
 
+type BrandSortKey = "number" | "name" | "created_at";
+
+const BRAND_SORT_OPTIONS: Array<{ value: BrandSortKey; label: string }> = [
+  { value: "number", label: "Código (#)" },
+  { value: "name", label: "Nome da Marca" },
+  { value: "created_at", label: "Criado em" },
+];
+
 export function BrandTable() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [sortState, setSortState] = useState<SortState<BrandSortKey> | null>(null);
+  const [appliedFilters, setAppliedFilters] = useState<{
+    search: string;
+    sortState: SortState<BrandSortKey> | null;
+  }>({ search: "", sortState: null });
   const [brandToDelete, setBrandToDelete] = useState<BrandResource | null>(null);
 
   const { can } = usePermissions();
@@ -40,17 +59,62 @@ export function BrandTable() {
   const canDelete = can("brand.delete");
   const hasActions = canEdit || canDelete;
 
-  const { data, isLoading, isError, error, refetch } = useBrands(page);
+  const { data, isLoading, isFetching, isError, error, refetch } = useBrands({
+    page,
+    search: appliedFilters.search,
+    sort_by: appliedFilters.sortState?.key,
+    sort_direction: appliedFilters.sortState?.direction,
+  });
   const deleteMutation = useDeleteBrand();
 
-  const brands = data?.data || [];
+  const brands = useMemo(() => data?.data || [], [data]);
   const meta = data?.meta;
+
+  const hasDraftFilters = search.trim() !== "" || sortState !== null;
+  const hasAppliedFilters =
+    appliedFilters.search.trim() !== "" || appliedFilters.sortState !== null;
+  const hasActiveFilters = hasDraftFilters || hasAppliedFilters;
+
+  const handleApplyFilters = () => {
+    const isSame =
+      appliedFilters.search === search &&
+      appliedFilters.sortState?.key === sortState?.key &&
+      appliedFilters.sortState?.direction === sortState?.direction;
+
+    if (isSame && page === 1) {
+      void refetch();
+      return;
+    }
+
+    setAppliedFilters({ search, sortState });
+    setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setSearch("");
+    setSortState(null);
+    setAppliedFilters({ search: "", sortState: null });
+    setPage(1);
+  };
+
+  const handleHeaderSort = (key: string) => {
+    const nextSort = toggleSortState(
+      appliedFilters.sortState,
+      key as BrandSortKey
+    );
+    setSortState(nextSort);
+    setAppliedFilters((prev) => ({ ...prev, sortState: nextSort }));
+    setPage(1);
+  };
 
   const handleDeleteConfirm = async () => {
     if (!brandToDelete) return;
     try {
       await deleteMutation.mutateAsync(brandToDelete.id);
       setBrandToDelete(null);
+      if (brands.length === 1 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      }
     } catch {
       // Erro tratado no hook
     }
@@ -91,7 +155,7 @@ export function BrandTable() {
     );
   }
 
-  if (brands.length === 0) {
+  if (brands.length === 0 && !hasAppliedFilters && page === 1 && (meta?.total ?? 0) === 0) {
     return (
       <EmptyState
         icon={Tags}
@@ -113,21 +177,102 @@ export function BrandTable() {
 
   return (
     <div className="space-y-4">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por nome, código ou descrição..."
+        sortOptions={BRAND_SORT_OPTIONS}
+        sortState={sortState}
+        onSortKeyChange={(key) =>
+          setSortState(
+            key ? { key: key as BrandSortKey, direction: sortState?.direction ?? "asc" } : null
+          )
+        }
+        onSortDirectionToggle={() =>
+          setSortState((prev) =>
+            prev
+              ? { ...prev, direction: prev.direction === "asc" ? "desc" : "asc" }
+              : null
+          )
+        }
+        onSubmit={handleApplyFilters}
+        onClearAll={clearAllFilters}
+        hasActiveFilters={hasActiveFilters}
+        isFetching={isFetching && !isLoading}
+        filteredCount={brands.length}
+        totalCount={meta?.total ?? brands.length}
+      />
+
       <div className="rounded-md border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">#</TableHead>
-              <TableHead>Nome da Marca</TableHead>
+              <SortableTableHead
+                label="#"
+                sortKey="number"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-16"
+              />
+              <SortableTableHead
+                label="Nome da Marca"
+                sortKey="name"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+              />
               <TableHead>Descrição</TableHead>
-              <TableHead className="w-36">Criado em</TableHead>
+              <SortableTableHead
+                label="Criado em"
+                sortKey="created_at"
+                sortState={appliedFilters.sortState}
+                onSort={handleHeaderSort}
+                className="w-36"
+              />
               {hasActions && (
                 <TableHead className="w-16 text-center">Ações</TableHead>
               )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {brands.map((brand) => (
+            {brands.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={hasActions ? 5 : 4}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  {page > 1 && meta && meta.total > 0 ? (
+                    <>
+                      <p>Nenhum registro nesta página.</p>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setPage(Math.max(1, meta.last_page))}
+                        className="mt-1"
+                      >
+                        Ir para a última página
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p>Nenhuma marca encontrada com os filtros atuais.</p>
+                      {hasAppliedFilters && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          onClick={clearAllFilters}
+                          className="mt-1"
+                        >
+                          Limpar filtros
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              brands.map((brand) => (
               <TableRow key={brand.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   #{brand.number}
@@ -178,7 +323,8 @@ export function BrandTable() {
                   </TableCell>
                 )}
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>

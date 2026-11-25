@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import type { PaginatedResponse } from "@/lib/api/types";
 import type {
   AddressResource,
   StoreAddressRequest,
@@ -8,9 +9,10 @@ import type {
 export type AddressOwnerType = "clients" | "sellers" | "suppliers";
 
 export const addressService = {
-  list(ownerType: AddressOwnerType, ownerId: string) {
-    return apiClient.get<{ data: AddressResource[] }>(
-      `/v1/${ownerType}/${ownerId}/addresses`
+  list(ownerType: AddressOwnerType, ownerId: string, page = 1) {
+    return apiClient.get<PaginatedResponse<AddressResource>>(
+      `/v1/${ownerType}/${ownerId}/addresses`,
+      { page }
     );
   },
 

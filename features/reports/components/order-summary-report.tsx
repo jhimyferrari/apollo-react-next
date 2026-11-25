@@ -183,7 +183,7 @@ function SummaryView({
               subtitle="Panorama geral no período e parceiro selecionados"
               entries={totals.by_status}
               labels={STATUS_LABELS}
-              expectedKeys={["confirmed", "draf", "cancelled"]}
+              expectedKeys={["confirmed", "draft", "cancelled"]}
             />
             <BreakdownCard
               title="Distribuição por Status de Pagamento"
@@ -395,6 +395,7 @@ export function SalesSummaryReportView() {
         onFilterPendingRefund={() =>
           setFilters((f) => ({
             ...f,
+            date_field: f.date_field ?? "cancelled_at",
             status: "cancelled",
             payment_status: "paid",
             page: 1,
@@ -440,6 +441,7 @@ export function PurchasesSummaryReportView() {
         onFilterPendingRefund={() =>
           setFilters((f) => ({
             ...f,
+            date_field: f.date_field ?? "cancelled_at",
             status: "cancelled",
             payment_status: "paid",
             page: 1,

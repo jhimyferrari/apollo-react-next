@@ -9,6 +9,17 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<NextResponse> {
   const session = await fetchServerSession();
 
+  if (session.transientError) {
+    return NextResponse.json(
+      {
+        authenticated: false,
+        user: null,
+        transientError: true,
+      },
+      { status: 503, headers: NO_CACHE_HEADERS }
+    );
+  }
+
   const response = NextResponse.json(
     {
       authenticated: session.authenticated,

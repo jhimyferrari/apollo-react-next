@@ -10,18 +10,19 @@ import { useBrand } from "@/features/brands/hooks/use-brands";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function EditBrandPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const { data, isLoading, isError, error, refetch } = useBrand(id);
+function EditBrandContent({ id }: { id: string }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchedAfterMount,
+    isError,
+    error,
+    refetch,
+  } = useBrand(id);
   const brand = data?.data;
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !isFetchedAfterMount)) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -62,21 +63,35 @@ export default function EditBrandPage({
   }
 
   return (
-    <PermissionGuard
-      permission="brand.update"
-      title="Edição Não Permitida"
-      description="Você não possui permissão para editar os dados desta marca."
-    >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Editar Marca: ${brand.name}`}
-          description={`Código #${brand.number} • Atualize as informações desejadas`}
-        />
+    <div className="space-y-6">
+      <PageHeader
+        title={`Editar Marca: ${brand.name}`}
+        description={`Código #${brand.number} • Atualize as informações desejadas`}
+      />
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-          <BrandForm initialData={brand} />
-        </div>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+        <BrandForm initialData={brand} />
       </div>
+    </div>
+  );
+}
+
+export default function EditBrandPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
+    <PermissionGuard
+      permission={["brand.view", "brand.update"]}
+      mode="all"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para visualizar ou editar os dados desta marca."
+    >
+      <EditBrandContent id={id} />
     </PermissionGuard>
   );
 }

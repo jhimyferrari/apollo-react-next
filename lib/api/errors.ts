@@ -150,10 +150,11 @@ export function parseApiError(
 
     // Heurísticas adicionais para mapear campos quando a API retorna 422 / DUPLICATE_FIELD / INVALID_PASSWORD sem 'fields' estruturado
     if (
-      statusCode === 422 ||
-      code === "VALIDATION_ERROR" ||
-      code === "INVALID_PASSWORD" ||
-      code === "DUPLICATE_FIELD"
+      Object.keys(fields).length === 0 &&
+      (statusCode === 422 ||
+        code === "VALIDATION_ERROR" ||
+        code === "INVALID_PASSWORD" ||
+        code === "DUPLICATE_FIELD")
     ) {
       const lowerMsg = message.toLowerCase();
       if (

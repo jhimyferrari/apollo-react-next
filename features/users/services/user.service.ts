@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import type {
   UserResource,
   StoreUserRequest,
@@ -7,9 +8,16 @@ import type {
   UpdateOwnPasswordRequest,
 } from "../types";
 
+export interface UserListParams extends BaseListParams {
+  profile?: string;
+}
+
 export const userService = {
-  list(params?: { page?: number; per_page?: number }) {
-    return apiClient.get<PaginatedResponse<UserResource>>("/v1/users", params);
+  list(params?: UserListParams) {
+    return apiClient.get<PaginatedResponse<UserResource>>(
+      "/v1/users",
+      cleanListParams(params)
+    );
   },
 
   getById(id: string) {

@@ -73,42 +73,42 @@ export function useFilterOptions(entity: FilterEntity, enabled: boolean) {
           const res = await lookupService.clients({ status: "all" });
           return (res.data || []).map((c) => ({
             value: c.id,
-            label: `#${c.number} - ${c.name}${c.document ? ` (${maskDocument(c.document)})` : ""}`,
+            label: `${c.number} - ${c.name}${c.document ? ` (${maskDocument(c.document)})` : ""}`,
           }));
         }
         case "sellers": {
           const res = await lookupService.sellers({ status: "all" });
           return (res.data || []).map((s) => ({
             value: s.id,
-            label: `#${s.number} - ${s.name}`,
+            label: `${s.number} - ${s.name}`,
           }));
         }
         case "suppliers": {
           const res = await lookupService.suppliers({ status: "all" });
           return (res.data || []).map((s) => ({
             value: s.id,
-            label: `#${s.number} - ${s.name}${s.document ? ` (${maskDocument(s.document)})` : ""}`,
+            label: `${s.number} - ${s.name}${s.document ? ` (${maskDocument(s.document)})` : ""}`,
           }));
         }
         case "products": {
           const res = await lookupService.products({ status: "all" });
           return (res.data || []).map((p) => ({
             value: p.id,
-            label: `#${p.number} - ${p.name} (${p.unit.toUpperCase()})`,
+            label: `${p.number} - ${p.name} (${p.unit.toUpperCase()})`,
           }));
         }
         case "categories": {
           const res = await lookupService.categories();
           return (res.data || []).map((c) => ({
             value: c.id,
-            label: `#${c.number} - ${c.name}`,
+            label: `${c.number} - ${c.name}`,
           }));
         }
         case "brands": {
           const res = await lookupService.brands();
           return (res.data || []).map((b) => ({
             value: b.id,
-            label: `#${b.number} - ${b.name}`,
+            label: `${b.number} - ${b.name}`,
           }));
         }
       }

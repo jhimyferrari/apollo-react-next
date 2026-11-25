@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import type { ApiResponse } from "@/lib/api/types";
 import type {
   BrandLookupResource,
   CategoryLookupResource,
@@ -60,6 +61,58 @@ export const lookupService = {
     return apiClient.get<LookupResponse<CategoryLookupResource>>(
       "/v1/lookups/categories",
       cleanLookupParams(params)
+    );
+  },
+
+  clientByNumber(
+    number: number | string,
+    params?: Pick<LookupParams, "status">
+  ) {
+    return apiClient.get<ApiResponse<ClientLookupResource>>(
+      `/v1/lookups/clients/${number}`,
+      cleanLookupParams(params)
+    );
+  },
+
+  sellerByNumber(
+    number: number | string,
+    params?: Pick<LookupParams, "status">
+  ) {
+    return apiClient.get<ApiResponse<SellerLookupResource>>(
+      `/v1/lookups/sellers/${number}`,
+      cleanLookupParams(params)
+    );
+  },
+
+  productByNumber(
+    number: number | string,
+    params?: Pick<LookupParams, "status">
+  ) {
+    return apiClient.get<ApiResponse<ProductLookupResource>>(
+      `/v1/lookups/products/${number}`,
+      cleanLookupParams(params)
+    );
+  },
+
+  supplierByNumber(
+    number: number | string,
+    params?: Pick<LookupParams, "status">
+  ) {
+    return apiClient.get<ApiResponse<SupplierLookupResource>>(
+      `/v1/lookups/suppliers/${number}`,
+      cleanLookupParams(params)
+    );
+  },
+
+  brandByNumber(number: number | string) {
+    return apiClient.get<ApiResponse<BrandLookupResource>>(
+      `/v1/lookups/brands/${number}`
+    );
+  },
+
+  categoryByNumber(number: number | string) {
+    return apiClient.get<ApiResponse<CategoryLookupResource>>(
+      `/v1/lookups/categories/${number}`
     );
   },
 };

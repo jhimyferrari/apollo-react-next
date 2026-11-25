@@ -142,6 +142,7 @@ export function UserForm({ initialData }: UserFormProps) {
   const isSelfTarget = Boolean(
     currentUser?.id && initialData?.id === currentUser.id
   );
+  const isReadOnlyTarget = isSelfTarget || isAdminTarget;
 
   const createForm = useForm<UserCreateFormData>({
     resolver: zodResolver(userCreateSchema),
@@ -231,7 +232,7 @@ export function UserForm({ initialData }: UserFormProps) {
   };
 
   const handleUpdateSubmit = async (formData: UserUpdateFormData) => {
-    if (!initialData || isSelfTarget) return;
+    if (!initialData || isReadOnlyTarget) return;
     setPermissionsError(null);
 
     const trimmedName = formData.name.trim();
@@ -330,7 +331,7 @@ export function UserForm({ initialData }: UserFormProps) {
                     placeholder="Ex.: Mariana Silva"
                     className="pl-9"
                     {...updateForm.register("name")}
-                    disabled={isSubmitting || isSelfTarget}
+                    disabled={isSubmitting || isReadOnlyTarget}
                   />
                 </div>
                 <FormFieldError error={updateForm.formState.errors.name} />
@@ -348,13 +349,13 @@ export function UserForm({ initialData }: UserFormProps) {
                     placeholder="operador@empresa.com.br"
                     className="pl-9"
                     {...updateForm.register("email")}
-                    disabled={isSubmitting || isSelfTarget}
+                    disabled={isSubmitting || isReadOnlyTarget}
                   />
                 </div>
                 <FormFieldError error={updateForm.formState.errors.email} />
               </div>
 
-              {!isSelfTarget && (
+              {!isReadOnlyTarget && (
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="edit-password" className="text-sm font-medium">
                     Nova Senha{" "}
@@ -405,8 +406,9 @@ export function UserForm({ initialData }: UserFormProps) {
                   Usuário Administrador
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Administradores possuem acesso total ao sistema e suas permissões não
-                  podem ser modificadas. Apenas nome, e-mail e senha podem ser atualizados.
+                  Administradores possuem acesso total ao sistema e não podem ter
+                  seus dados ou permissões alterados por outros usuários (apenas
+                  o próprio administrador pode alterar sua senha).
                 </p>
               </div>
             </div>
@@ -444,7 +446,7 @@ export function UserForm({ initialData }: UserFormProps) {
                   Alterar Minha Senha
                 </Button>
               )
-            ) : (
+            ) : isAdminTarget ? null : (
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>

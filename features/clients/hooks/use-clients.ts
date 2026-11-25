@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { clientService } from "../services/client.service";
+import { clientService, type ClientListParams } from "../services/client.service";
 import { parseApiError } from "@/lib/api/errors";
 import { useClientLookup } from "@/features/lookups/hooks/use-lookups";
 import type { StoreClientRequest, UpdateClientRequest } from "../types";
 
 export { useClientLookup };
 
-export function useClients(page = 1) {
+export function useClients(params?: ClientListParams) {
   return useQuery({
-    queryKey: ["clients", page],
-    queryFn: () => clientService.list({ page }),
+    queryKey: ["clients", params ?? {}],
+    queryFn: () => clientService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -54,9 +55,15 @@ export function useUpdateClient() {
       id: string;
       data: Partial<UpdateClientRequest>;
     }) => clientService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-      queryClient.invalidateQueries({ queryKey: ["lookups", "clients"] });
+    onSuccess: async (_data, variables) => {
+      queryClient.removeQueries({
+        queryKey: ["clients", variables.id],
+        exact: true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["clients"] }),
+        queryClient.invalidateQueries({ queryKey: ["lookups", "clients"] }),
+      ]);
       toast.success("Cliente atualizado com sucesso!");
     },
     onError: (err) => {

@@ -355,21 +355,21 @@ Os módulos de **Pedidos de Venda (`sales-orders`)** e **Pedidos de Compra (`pur
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draf : Criação (POST /v1/*-orders)
-    draf --> draf : Edição de Cabeçalho e Diff de Itens (PATCH /v1/*-orders/{id})
-    draf --> confirmed : Confirmar Pedido (PATCH /v1/*-orders/{id}/confirm)
-    draf --> cancelled : Cancelar Rascunho (PATCH /v1/*-orders/{id}/cancel)
+    [*] --> draft: Criação (POST /v1/*-orders)
+    draft--> draft: Edição de Cabeçalho e Diff de Itens (PATCH /v1/*-orders/{id})
+    draft--> confirmed : Confirmar Pedido (PATCH /v1/*-orders/{id}/confirm)
+    draft--> cancelled : Cancelar Rascunho (PATCH /v1/*-orders/{id}/cancel)
     confirmed --> cancelled : Cancelar Pedido Confirmado (Estorna Estoque)
-    confirmed --> draf : Reabrir Pedido (Cancela original + Cria novo Rascunho vinculado)
-    cancelled --> draf : Reabrir Pedido (Cria novo Rascunho vinculado ao cancelado)
+    confirmed --> draft: Reabrir Pedido (Cancela original + Cria novo Rascunho vinculado)
+    cancelled --> draft: Reabrir Pedido (Cria novo Rascunho vinculado ao cancelado)
 ```
 
 ### 8.1. Particularidades Técnicas Importantes dos Pedidos
 
-1. **Valor Literal do Status de Rascunho (`"draf"`)**:
-   * Por contrato do backend Laravel (`OrderStatus::Draft = 'draf'`), o status de rascunho no JSON é grafado literalmente como `"draf"`. Todos os tipos TypeScript, filtros e badges do frontend respeitam essa constante exata.
+1. **Valor Literal do Status de Rascunho (`"draft"`)**:
+   * Por contrato do backend Laravel (`OrderStatus::Draft = 'draft'`), o status de rascunho no JSON é grafado literalmente como `"draft"`. Todos os tipos TypeScript, filtros e badges do frontend respeitam essa constante exata.
 2. **Operações Delta em Itens na Edição de Rascunho (`items.to_add`, `to_update`, `to_remove`)**:
-   * Enquanto um pedido está em rascunho (`draf`), sua edição (`PATCH /v1/{orders}/{id}`) não sobrescreve cegamente a lista de itens. O formulário compara os itens originais (identificados pelo seu número sequencial `number`) com os itens atuais e monta o objeto delta:
+   * Enquanto um pedido está em rascunho (`draft`), sua edição (`PATCH /v1/{orders}/{id}`) não sobrescreve cegamente a lista de itens. O formulário compara os itens originais (identificados pelo seu número sequencial `number`) com os itens atuais e monta o objeto delta:
      * `to_add`: Novos produtos adicionados ao pedido (`{ product_id, quantity }`).
      * `to_update`: Itens existentes cuja quantidade ou produto foi alterado (`{ number, product_id, quantity }`).
      * `to_remove`: Itens existentes removidos pelo usuário (`{ number }`).
@@ -378,11 +378,11 @@ stateDiagram-v2
    * Ao confirmar um **Pedido de Compra**, o backend realiza a entrada de estoque (`StockMovement` de entrada).
 4. **Reabertura de Pedido (`/reopen`), Rastreabilidade e Divergência de Preços (`outdated_prices`)**:
    * Pedidos nos status `confirmed` ou `cancelled` não podem ser editados diretamente, mas podem ser **Reabertos** (`PATCH /v1/{orders}/{id}/reopen`).
-   * A reabertura cancela o pedido original (caso ainda esteja confirmado, estornando o estoque) e cria automaticamente um **novo pedido em rascunho (`draf`)** contendo os mesmos itens e vinculado ao pedido anterior através de `replaces_order_id` (exibido na UI pelos links de rastreabilidade *"Substitui o pedido #X"* e *"Substituído pelo pedido #Y"*).
+   * A reabertura cancela o pedido original (caso ainda esteja confirmado, estornando o estoque) e cria automaticamente um **novo pedido em rascunho (`draft`)** contendo os mesmos itens e vinculado ao pedido anterior através de `replaces_order_id` (exibido na UI pelos links de rastreabilidade *"Substitui o pedido #X"* e *"Substituído pelo pedido #Y"*).
    * Se o preço de catálogo de algum produto tiver sofrido alteração desde a emissão do pedido original, o endpoint `/reopen` retorna a lista `outdated_prices` (contendo `negotiated_price` vs. `current_price`), apresentada em um banner de alerta detalhado na tela do novo pedido.
 5. **Fluxo Dedicado de Status de Pagamento (`PATCH /v1/{orders}/{id}/payment-status`)**:
    * O `payment_status` possui 4 valores possíveis: `pending`, `paid`, `refunded` e `cancelled`, desacoplados da edição cadastral de rascunho (`PATCH /v1/{orders}/{id}`).
-   * As transições manuais permitidas são centralizadas em [`lib/orders/payment-status.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/orders/payment-status.ts) (`getAvailablePaymentAction`): em pedidos `draf` ou `confirmed`, alterna `pending` ↔ `paid`; em pedidos `cancelled` ainda pagos (`paid`), permite apenas estornar para `refunded`.
+   * As transições manuais permitidas são centralizadas em [`lib/orders/payment-status.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/orders/payment-status.ts) (`getAvailablePaymentAction`): em pedidos `draft` ou `confirmed`, alterna `pending` ↔ `paid`; em pedidos `cancelled` ainda pagos (`paid`), permite apenas estornar para `refunded`.
    * Eventos de pagamento e estorno registram os timestamps `paid_at` e `refunded_at` retornados pela API e exibidos nos detalhes do pedido.
 
 ---

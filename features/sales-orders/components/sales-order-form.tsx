@@ -9,13 +9,6 @@ import { Loader2, ArrowLeft, Save, Plus, Trash2, ShoppingCart } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormFieldError } from "@/components/common/form-field-error";
 import { MoneyDisplay } from "@/components/common/money-display";
@@ -26,7 +19,14 @@ import {
   useSellerLookup,
   useProductLookup,
 } from "@/features/lookups/hooks/use-lookups";
-import { extractLookupAmount } from "@/features/lookups/types";
+import { LookupCodeSelect } from "@/features/lookups/components/lookup-code-select";
+import { lookupService } from "@/features/lookups/services/lookup.service";
+import {
+  extractLookupAmount,
+  type ClientLookupResource,
+  type ProductLookupResource,
+  type SellerLookupResource,
+} from "@/features/lookups/types";
 import { maskDocument, maskStock } from "@/lib/masks";
 import { parseApiError, applyApiValidationErrors } from "@/lib/api/errors";
 
@@ -75,10 +75,19 @@ export function SalesOrderForm() {
 
   const isSubmitting = createMutation.isPending;
 
-  const handleProductChange = (index: number, productId: string) => {
+  const handleProductChange = (
+    index: number,
+    productId: string,
+    resolvedProduct?: ProductLookupResource
+  ) => {
     setValue(`items.${index}.product_id`, productId, { shouldValidate: true });
 
-    const prod = products.find((p) => p.id === productId);
+    if (!productId) {
+      setValue(`items.${index}.unit_price`, "0.0000");
+      return;
+    }
+
+    const prod = resolvedProduct ?? products.find((p) => p.id === productId);
     if (prod) {
       const priceStr = extractLookupAmount(prod.sale_price, "0");
       setValue(`items.${index}.unit_price`, priceStr);
@@ -122,25 +131,22 @@ export function SalesOrderForm() {
           <Label htmlFor="client_id" className="text-sm font-medium">
             Cliente <span className="text-destructive">*</span>
           </Label>
-          <Select
+          <LookupCodeSelect<ClientLookupResource>
+            id="client_id"
             value={clientIdValue}
             onValueChange={(val) =>
               setValue("client_id", val, { shouldValidate: true })
             }
-            disabled={isLoadingClients || isSubmitting}
-          >
-            <SelectTrigger id="client_id">
-              <SelectValue placeholder="Selecione o cliente comprador" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  #{c.number} - {c.name}
-                  {c.document ? ` (${maskDocument(c.document)})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={clients}
+            lookupByNumber={(num) => lookupService.clientByNumber(num)}
+            renderOptionLabel={(c) =>
+              `${c.number} - ${c.name}${c.document ? ` (${maskDocument(c.document)})` : ""}`
+            }
+            placeholder="Selecione o cliente comprador"
+            resourceLabel="Cliente"
+            disabled={isSubmitting}
+            isLoadingOptions={isLoadingClients}
+          />
           <FormFieldError error={errors.client_id} />
         </div>
 
@@ -149,24 +155,20 @@ export function SalesOrderForm() {
           <Label htmlFor="seller_id" className="text-sm font-medium">
             Vendedor Responsável <span className="text-destructive">*</span>
           </Label>
-          <Select
+          <LookupCodeSelect<SellerLookupResource>
+            id="seller_id"
             value={sellerIdValue}
             onValueChange={(val) =>
               setValue("seller_id", val, { shouldValidate: true })
             }
-            disabled={isLoadingSellers || isSubmitting}
-          >
-            <SelectTrigger id="seller_id">
-              <SelectValue placeholder="Selecione o vendedor" />
-            </SelectTrigger>
-            <SelectContent>
-              {sellers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  #{s.number} - {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={sellers}
+            lookupByNumber={(num) => lookupService.sellerByNumber(num)}
+            renderOptionLabel={(s) => `${s.number} - ${s.name}`}
+            placeholder="Selecione o vendedor"
+            resourceLabel="Vendedor"
+            disabled={isSubmitting}
+            isLoadingOptions={isLoadingSellers}
+          />
           <FormFieldError error={errors.seller_id} />
         </div>
       </div>
@@ -218,22 +220,21 @@ export function SalesOrderForm() {
                   {/* Seleção de Produto */}
                   <div className="md:col-span-5 space-y-1">
                     <Label className="text-xs font-medium">Produto</Label>
-                    <Select
+                    <LookupCodeSelect<ProductLookupResource>
                       value={watchedItems[index]?.product_id || ""}
-                      onValueChange={(val) => handleProductChange(index, val)}
-                      disabled={isLoadingProducts || isSubmitting}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um produto..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.number} - {p.name} ({p.unit.toUpperCase()})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onValueChange={(val, resolved) =>
+                        handleProductChange(index, val, resolved)
+                      }
+                      options={products}
+                      lookupByNumber={(num) => lookupService.productByNumber(num)}
+                      renderOptionLabel={(p) =>
+                        `${p.number} - ${p.name} (${p.unit.toUpperCase()})`
+                      }
+                      placeholder="Selecione um produto..."
+                      resourceLabel="Produto"
+                      disabled={isSubmitting}
+                      isLoadingOptions={isLoadingProducts}
+                    />
                     <FormFieldError error={errors.items?.[index]?.product_id} />
                   </div>
 

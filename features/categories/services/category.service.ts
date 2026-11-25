@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/api/types";
+import { cleanListParams, type BaseListParams } from "@/lib/table-utils";
 import { lookupService } from "@/features/lookups/services/lookup.service";
 import type { LookupParams } from "@/features/lookups/types";
 import type {
@@ -8,11 +9,13 @@ import type {
   UpdateCategoryRequest,
 } from "../types";
 
+export type CategoryListParams = BaseListParams;
+
 export const categoryService = {
-  list(params?: { page?: number; per_page?: number }) {
+  list(params?: CategoryListParams) {
     return apiClient.get<PaginatedResponse<CategoryResource>>(
       "/v1/categories",
-      params
+      cleanListParams(params)
     );
   },
 

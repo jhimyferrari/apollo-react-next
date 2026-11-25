@@ -22,7 +22,7 @@ import { extractMoneyAmount, formatBRL } from "@/lib/formatters";
 import type { ReportBreakdownEntry } from "../types";
 
 export const STATUS_LABELS: Record<string, string> = {
-  draf: "Rascunho",
+  draft: "Rascunho",
   confirmed: "Confirmado",
   cancelled: "Cancelado",
 };
@@ -161,7 +161,7 @@ export function StatCard({
 const BREAKDOWN_BAR_COLORS: Record<string, string> = {
   confirmed: "bg-emerald-500",
   paid: "bg-emerald-500",
-  draf: "bg-amber-500",
+  draft: "bg-amber-500",
   pending: "bg-amber-500",
   refunded: "bg-sky-500",
   cancelled: "bg-rose-500",
@@ -170,7 +170,7 @@ const BREAKDOWN_BAR_COLORS: Record<string, string> = {
 const BREAKDOWN_DOT_COLORS: Record<string, string> = {
   confirmed: "bg-emerald-500",
   paid: "bg-emerald-500",
-  draf: "bg-amber-500",
+  draft: "bg-amber-500",
   pending: "bg-amber-500",
   refunded: "bg-sky-500",
   cancelled: "bg-rose-500",

@@ -45,7 +45,7 @@ const ALL = "__all__";
 
 const STATUS_OPTIONS = [
   { value: "confirmed", label: "Confirmados" },
-  { value: "draf", label: "Rascunhos" },
+  { value: "draft", label: "Rascunhos" },
   { value: "cancelled", label: "Cancelados" },
   { value: "all", label: "Todos os status" },
 ];
@@ -303,6 +303,12 @@ export function ReportFilterBar({
   isFetching = false,
 }: ReportFilterBarProps) {
   const [draft, setDraft] = useState<ReportFilters>(value);
+  const [prevValue, setPrevValue] = useState<ReportFilters>(value);
+
+  if (prevValue !== value) {
+    setPrevValue(value);
+    setDraft(value);
+  }
 
   const set = <K extends keyof ReportFilters>(
     key: K,

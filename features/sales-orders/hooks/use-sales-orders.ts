@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { salesOrderService } from "../services/sales-order.service";
+import { salesOrderService, type SalesOrderListParams } from "../services/sales-order.service";
 import { parseApiError } from "@/lib/api/errors";
 import type {
   PaymentStatus,
@@ -10,10 +10,11 @@ import type {
   UpdateSalesOrderRequest,
 } from "../types";
 
-export function useSalesOrders(page = 1, status?: string) {
+export function useSalesOrders(params?: SalesOrderListParams) {
   return useQuery({
-    queryKey: ["sales-orders", page, status],
-    queryFn: () => salesOrderService.list({ page, status }),
+    queryKey: ["sales-orders", params ?? {}],
+    queryFn: () => salesOrderService.list(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -32,6 +33,7 @@ export function useCreateSalesOrder() {
     mutationFn: (data: StoreSalesOrderRequest) => salesOrderService.create(data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido de venda criado com sucesso!");
     },
     onError: (err) => {
@@ -56,6 +58,7 @@ export function useUpdateSalesOrder() {
     }) => salesOrderService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Pedido atualizado com sucesso!");
     },
     onError: (err) => {
@@ -75,6 +78,7 @@ export function useConfirmSalesOrder() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido de venda confirmado!");
     },
     onError: (err) => {
@@ -96,6 +100,7 @@ export function useReopenSalesOrder() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido reaberto com sucesso!");
 
       const outdated = res?.data?.outdated_prices;
@@ -122,6 +127,7 @@ export function useCancelSalesOrder() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(res?.message || "Pedido cancelado com sucesso!");
     },
     onError: (err) => {
@@ -163,6 +169,7 @@ export function useDeleteSalesOrder() {
     mutationFn: (id: string) => salesOrderService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Pedido excluído com sucesso!");
     },
     onError: (err) => {

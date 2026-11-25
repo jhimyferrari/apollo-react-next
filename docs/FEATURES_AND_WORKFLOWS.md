@@ -225,7 +225,7 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 
 | Tipo | Valor na API | Rótulo na UI | Cor do Badge |
 | :--- | :--- | :--- | :--- |
-| **Status do Pedido** | `"draf"` *(grafia literal da API)* | Rascunho | Neutro / Secundário |
+| **Status do Pedido** | `"draft"` *(grafia literal da API)* | Rascunho | Neutro / Secundário |
 | **Status do Pedido** | `"confirmed"` | Confirmado | Verde / Sucesso |
 | **Status do Pedido** | `"cancelled"` | Cancelado | Vermelho / Destrutivo |
 | **Status de Pagamento** | `"pending"` | Pendente | Contorno / Neutro |
@@ -234,12 +234,12 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 | **Status de Pagamento** | `"cancelled"` | Cancelado | Vermelho / Destrutivo |
 
 ### 9.2. Criação de Pedido (`POST /v1/{sales|purchase}-orders`)
-* Todo pedido nasce no status `"draf"` (Rascunho).
-* O operador seleciona o parceiro comercial, status de pagamento inicial (`pending` ou `paid`), observações (`notes`) e adiciona os itens (`product_id` e `quantity`).
+* Todo pedido nasce no status `"draft"` (Rascunho).
+* O operador seleciona o parceiro comercial, statRascunhous de pagamento inicial (`pending` ou `paid`), observações (`notes`) e adiciona os itens (`product_id` e `quantity`).
 * A interface calcula e exibe em tempo real o subtotal estimado de cada linha e o total geral do pedido apenas para pré-visualização visual; **`subtotal` não é enviado no payload** de criação nem de edição, pois os cálculos oficiais são feitos exclusivamente pelo backend.
 
 ### 9.3. Edição de Pedido em Rascunho (`PATCH /v1/{sales|purchase}-orders/{id}`)
-* Apenas pedidos com `status === "draf"` podem ser editados.
+* Apenas pedidos com `status === "draft"` podem ser editados.
 * O formulário calcula automaticamente:
   1. As alterações de cabeçalho (`client_id`/`supplier_id`, `seller_id`, `notes`). O `payment_status` não é mais editado aqui, utilizando o endpoint dedicado abaixo.
   2. O **diff estruturado de itens (`items`)** comparando a lista original do pedido com a lista presente no formulário (incluindo troca direta de `product_id` em itens de rascunho em `to_update`):
@@ -263,16 +263,16 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
 ### 9.4. Ações Transacionais na Página de Detalhes (`/[id]`)
 
 1. **Confirmar Pedido (`PATCH /v1/{orders}/{id}/confirm`)**:
-   * Disponível apenas quando `status === "draf"`.
+   * Disponível apenas quando `status === "draft"`.
    * Efetiva a movimentação de estoque no backend e altera o status para `"confirmed"`.
    * Se não houver saldo de estoque suficiente (no caso de Pedido de Venda), o backend retorna `422` e o frontend exibe a mensagem exata no toast de erro.
 2. **Cancelar Pedido (`PATCH /v1/{orders}/{id}/cancel`)**:
-   * Disponível quando `status === "draf"` ou `status === "confirmed"`.
+   * Disponível quando `status === "draft"` ou `status === "confirmed"`.
    * Abre um modal solicitando opcionalmente o **Motivo do Cancelamento (`reason`)**.
    * Caso o pedido já estivesse confirmado, o backend estorna automaticamente as movimentações de estoque e grava `cancellation_reason` e `cancelled_at`.
 3. **Reabrir Pedido (`PATCH /v1/{orders}/{id}/reopen`)**:
    * Disponível quando `status === "confirmed"` ou `status === "cancelled"`.
-   * Cria um **novo pedido em rascunho (`draf`)** copiando os dados e itens do pedido original, cancelando o original caso estivesse confirmado.
+   * Cria um **novo pedido em rascunho (`draft`)** copiando os dados e itens do pedido original, cancelando o original caso estivesse confirmado.
    * **Rastreabilidade Bidirecional**:
      * No pedido antigo, exibe um card/badge informando que ele foi **Substituído pelo Pedido #Y** (com link clicável).
      * No pedido novo, exibe um card/badge informando que ele **Substitui o Pedido #X** (com link clicável).
@@ -280,7 +280,7 @@ Ambos os módulos compartilham a mesma arquitetura transacional, diferenciando-s
      * Se algum item do pedido reaberto teve seu preço de catálogo alterado desde a negociação original, a resposta do endpoint `/reopen` retorna o array `outdated_prices` (contendo `product_id`, `name`, `negotiated_price` e `current_price`), que é destacado no topo da tela de detalhes para ciência do operador antes de reconfirmar o pedido.
 4. **Atualizar Status de Pagamento (`PATCH /v1/{orders}/{id}/payment-status`)**:
    * Regras centralizadas em [`lib/orders/payment-status.ts`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/lib/orders/payment-status.ts) (`getAvailablePaymentAction`), acessíveis na listagem e no cabeçalho de detalhes, sempre mediante confirmação em `ConfirmDialog`:
-     * Quando `status === "draf"` ou `"confirmed"`: alterna entre `pending` $\rightarrow$ `paid` (*Marcar como Pago*) e `paid` $\rightarrow$ `pending` (*Reverter para Pendente*).
+     * Quando `status === "draft"` ou `"confirmed"`: alterna entre `pending` $\rightarrow$ `paid` (*Marcar como Pago*) e `paid` $\rightarrow$ `pending` (*Reverter para Pendente*).
      * Quando `status === "cancelled"` e `payment_status === "paid"`: permite apenas `paid` $\rightarrow$ `refunded` (*Estornar Pagamento*).
    * A tela de detalhes também exibe os timestamps `paid_at` e `refunded_at` nos cards de datas do pedido.
 
@@ -292,16 +292,17 @@ Localização: [`features/lookups/`](file:///home/jhimy-ferrari/repos/apollo/apo
 
 Para preencher componentes `<Select>` sem truncamento de paginação e sem exigir que o operador possua permissão de leitura completa sobre o módulo relacionado (ex.: permitir que um vendedor com `sales-order.create` selecione clientes e produtos sem possuir `client.view` ou `product.view`), o frontend consome os endpoints leves `/v1/lookups/*`:
 
-| Endpoint | Hook | Serviço | Permissões Aceitas (Qualquer uma) |
+| Endpoint | Hook / Uso | Serviço | Permissões Aceitas (Qualquer uma) |
 | :--- | :--- | :--- | :--- |
-| `GET /v1/lookups/clients` | `useClientLookup` | `lookupService.clients` / `clientService.lookup` | `client.view`, `sales-order.view`, `sales-order.create`, `sales-order.update` |
-| `GET /v1/lookups/sellers` | `useSellerLookup` | `lookupService.sellers` / `sellerService.lookup` | `seller.view`, `sales-order.view`, `sales-order.create`, `sales-order.update` |
-| `GET /v1/lookups/products` | `useProductLookup` | `lookupService.products` / `productService.lookup` | `product.view`, `sales-order.*`, `purchase-order.*` |
-| `GET /v1/lookups/suppliers` | `useSupplierLookup` | `lookupService.suppliers` / `supplierService.lookup` | `supplier.view`, `purchase-order.view`, `purchase-order.create`, `purchase-order.update` |
-| `GET /v1/lookups/brands` | `useBrandLookup` | `lookupService.brands` / `brandService.lookup` | `brand.view`, `product.create`, `product.update` |
-| `GET /v1/lookups/categories` | `useCategoryLookup` | `lookupService.categories` / `categoryService.lookup` | `category.view`, `product.create`, `product.update` |
+| `GET /v1/lookups/clients` e `/clients/{number}` | `useClientLookup` / `LookupCodeSelect` | `lookupService.clients` / `clientByNumber` | `client.view`, `sales-order.view`, `sales-order.create`, `sales-order.update` |
+| `GET /v1/lookups/sellers` e `/sellers/{number}` | `useSellerLookup` / `LookupCodeSelect` | `lookupService.sellers` / `sellerByNumber` | `seller.view`, `sales-order.view`, `sales-order.create`, `sales-order.update` |
+| `GET /v1/lookups/products` e `/products/{number}` | `useProductLookup` / `LookupCodeSelect` | `lookupService.products` / `productByNumber` | `product.view`, `sales-order.*`, `purchase-order.*` |
+| `GET /v1/lookups/suppliers` e `/suppliers/{number}` | `useSupplierLookup` / `LookupCodeSelect` | `lookupService.suppliers` / `supplierByNumber` | `supplier.view`, `purchase-order.view`, `purchase-order.create`, `purchase-order.update` |
+| `GET /v1/lookups/brands` e `/brands/{number}` | `useBrandLookup` / `LookupCodeSelect` | `lookupService.brands` / `brandByNumber` | `brand.view`, `product.create`, `product.update` |
+| `GET /v1/lookups/categories` e `/categories/{number}` | `useCategoryLookup` / busca por código | `lookupService.categories` / `categoryByNumber` | `category.view`, `product.create`, `product.update` |
 
-* **Parâmetros suportados (`LookupParams`)**: `status` (`"active"` por padrão na emissão de pedidos, ou `"all"` nos filtros de relatórios para incluir registros inativos do histórico) e `search` (busca textual).
+* **Parâmetros suportados (`LookupParams`)**: `status` (`"active"` por padrão na emissão de pedidos e nas buscas unitárias por `number`, ou `"all"` nos filtros de relatórios para incluir registros inativos do histórico) e `search` (busca textual nas listagens).
+* **Seleção por Código Sequencial (`LookupCodeSelect`)**: Nos formulários de cadastro e edição de rascunho (Produtos, Pedidos de Venda e Pedidos de Compra), [`LookupCodeSelect`](file:///home/jhimy-ferrari/repos/apollo/apollo-react-next/features/lookups/components/lookup-code-select.tsx) acopla um campo numérico à esquerda do `<Select>` que consulta `GET /v1/lookups/{recurso}/{number}` ao pressionar `Enter` ou sair do campo (`onBlur`), selecionando o registro automaticamente (com erro inline em `404` e restauração via `Esc`). Em Produtos, categorias também podem ser vinculadas digitando seu código sequencial acima das pills.
 * **Invalidação Automática**: Qualquer criação, edição ou exclusão em `clients`, `sellers`, `suppliers`, `products`, `brands` ou `categories` invalida automaticamente a chave `["lookups", "<entidade>"]` no React Query.
 
 ---
@@ -323,13 +324,13 @@ Localização: [`features/reports/`](file:///home/jhimy-ferrari/repos/apollo/apo
   * **Atalhos rápidos de data**: *Hoje*, *Últimos 7 dias*, *Últimos 30 dias*, *Este mês*, *Mês passado*, *Este ano* e *Todo o período*.
   * **Parâmetros**:
     * Período (`start_date`/`end_date`) e campo de data (`date_field`: `confirmed_at`, `created_at`, `paid_at`, `refunded_at` ou `cancelled_at`).
-    * Status do pedido (`status`: `draf`, `confirmed`, `cancelled`, `all` — padrão *"Padrão (automático)"*, no qual o backend infere `cancelled` ao filtrar `payment_status=refunded` ou `cancelled` sem `status` explícito).
+    * Status do pedido (`status`: `draft`, `confirmed`, `cancelled`, `all` — padrão *"Padrão (automático)"*, no qual o backend infere `cancelled` ao filtrar `payment_status=refunded` ou `cancelled` sem `status` explícito).
     * Status de pagamento (`payment_status`: `pending`, `paid`, `refunded` ou `cancelled`), disponível tanto nos resumos (`sales/summary`, `purchases/summary`) quanto nos relatórios agrupados (`sales/by-product`, `sales/by-seller`).
     * Demais filtros por parceiro/catálogo (cliente, vendedor, fornecedor, produto, categoria, marca), ordenação (`order_by`/`order_direction`) e paginação (`per_page`: 15, 30, 50 ou 100).
 * **Estornos Pendentes e Datas Financeiras**:
   * Quando os totais de resumo retornam `pending_refund` (`status === "cancelled"` e `payment_status === "paid"`), um banner de alerta é exibido com o botão de filtro rápido **"Filtrar estornos pendentes"**.
   * As tabelas de resumo exibem as datas financeiras e de ciclo de vida (`paid_at`, `refunded_at`, `cancelled_at`) e consomem todos os valores monetários no formato `Money` (`{ amount, currency, formatted }`).
-* **Seletores de Entidade via Lookups**: Utilizam `/v1/lookups/*` com `status=all`, exibindo código sequencial (`#number`), nome e documento formatado, respeitando as permissões compostas do `LookupController`.
+* **Seletores de Entidade via Lookups**: Utilizam `/v1/lookups/*` com `status=all`, exibindo código sequencial (`number`), nome e documento formatado, respeitando as permissões compostas do `LookupController`.
 * **Ordenação Interativa e Curva de Participação**: Nos relatórios agrupados (*Vendas por Produto* e *Vendas por Vendedor*), os cabeçalhos das colunas numéricas permitem alternar a ordenação com um clique, exibindo posição no ranking (`1º`, `2º`, `3º`...) e barra visual de participação percentual no faturamento.
 
 ---

@@ -60,10 +60,13 @@ export function formatBRL(
   const decimalPart = strVal.split(".")[1] || "";
   const significantDecimals = decimalPart.replace(/0+$/, "").length;
 
-  const minDecimals =
+  const rawMin =
     options?.minDecimals ?? (significantDecimals > 2 ? Math.min(significantDecimals, 4) : 2);
-  const maxDecimals =
-    options?.maxDecimals ?? Math.max(minDecimals, Math.min(Math.max(significantDecimals, 2), 4));
+  const rawMax =
+    options?.maxDecimals ?? Math.max(rawMin, Math.min(Math.max(significantDecimals, 2), 4));
+
+  const maxDecimals = Math.min(20, Math.max(0, Math.floor(rawMax)));
+  const minDecimals = Math.min(maxDecimals, Math.max(0, Math.floor(rawMin)));
 
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",

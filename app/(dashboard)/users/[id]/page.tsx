@@ -10,18 +10,19 @@ import { useUser } from "@/features/users/hooks/use-users";
 import { PermissionGuard } from "@/components/common/permission-guard";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function EditUserPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const id = resolvedParams.id;
-
-  const { data, isLoading, isError, error, refetch } = useUser(id);
+function EditUserContent({ id }: { id: string }) {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchedAfterMount,
+    isError,
+    error,
+    refetch,
+  } = useUser(id);
   const user = data?.data;
 
-  if (isLoading) {
+  if (isLoading || (isFetching && !isFetchedAfterMount)) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -62,21 +63,35 @@ export default function EditUserPage({
   }
 
   return (
-    <PermissionGuard
-      permission="user.update"
-      title="Edição Não Permitida"
-      description="Você não possui permissão para editar os privilégios deste usuário."
-    >
-      <div className="space-y-6">
-        <PageHeader
-          title={`Permissões: ${user.name}`}
-          description={`${user.email} • Controle de acesso aos módulos operacionais do sistema`}
-        />
+    <div className="space-y-6">
+      <PageHeader
+        title={`Permissões: ${user.name}`}
+        description={`${user.email} • Controle de acesso aos módulos operacionais do sistema`}
+      />
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
-          <UserForm initialData={user} />
-        </div>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+        <UserForm initialData={user} />
       </div>
+    </div>
+  );
+}
+
+export default function EditUserPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
+  return (
+    <PermissionGuard
+      permission={["user.view", "user.update"]}
+      mode="all"
+      title="Edição Não Permitida"
+      description="Você não possui permissão para visualizar ou editar os privilégios deste usuário."
+    >
+      <EditUserContent id={id} />
     </PermissionGuard>
   );
 }
